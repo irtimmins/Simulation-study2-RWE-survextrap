@@ -148,7 +148,7 @@ plot_all_two_arm <- plot_grid(
   rel_heights = c(1,-0.05,1,-0.05,1),
   ncol = 1)
 
-tiff(file = "figure2.tiff",   
+tiff(file = "Plots/figure2.tiff",   
      width = 5.8, 
      height = 5.3,
      units = 'in',  

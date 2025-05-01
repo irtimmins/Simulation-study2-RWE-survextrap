@@ -1,6 +1,3 @@
-################
-setwd("~/survival_extrapolation/simsurvextrap")
-
 library(tidyr)
 library(dplyr)
 library(ggplot2)
@@ -18,33 +15,16 @@ library(data.table)
 library(survminer)
 library(RColorBrewer)
 
-jobname <- "mix_weib_full1"
-user <- Sys.info()["user"]
-project_directory <- paste0("/projects/aa/", user, "/")
-store_res <- paste0(project_directory, "simsurvextrap_slurm_", jobname, "/")
-
-source("R/simulate_dgm_mixture_weibull.R")
-
-setwd(store_res)
-
-#####################################################
-# Plot options
-##################################################### 
-
-margins <- unit(c(0,0,0,0), "cm")
-legend_text <- element_text(size=8)
-legend_key <- unit(0.3, "lines")
-legend_space_y <- unit(1.5, "pt")
-
+source("Functions/simulate_dgm_mixture_weibull.R")
 
 #####################################################
 # Single arm DGMs. 
 ##################################################### 
 
 dgm_true <- readRDS("dgm_true.rds")
-
 scenarios <- readRDS("scenarios.rds")
 
+# Select scenarios to plot.
 scenarios <- scenarios %>%
   filter(design_id == "single_arm",
          stan_fit_method == "mcmc",
@@ -53,9 +33,8 @@ scenarios <- scenarios %>%
          add_knots %in% c("none"),
          backhaz == T)
 
-
 for(i in 1:nrow(scenarios)){
-  
+  # read in results for each scenario
   temp <- readRDS(paste0(scenarios$scenario_fit_id[i], "/all_res.rds"))
   
   temp <- temp %>%
@@ -84,7 +63,6 @@ trial_data <- cetux %>%
          time = years)
 
 km_fit <- survfit(Surv(time, event) ~ 1, data=trial_data)
-#plot(km_fit)
 
 km_plot <- ggsurvplot(km_fit, data=trial_data)
 km_surv_df <- km_plot$data.survplot 
@@ -100,8 +78,14 @@ trial_data_km <- km_surv_df %>%
   select(time, surv, Dataset) %>%
   rename(t = time, value = surv)
 
+# Plot options
 margins1 <- unit(c(0.1,0.1,0,0), "cm")
 margins2 <- unit(c(0,0,0,0), "cm")
+margins <- unit(c(0,0,0,0), "cm")
+legend_text <- element_text(size=8)
+legend_key <- unit(0.3, "lines")
+legend_space_y <- unit(1.5, "pt")
+
 
 surv_plot <- scenarios %>%  
   filter(weibull_model_id == paste0("weibull_mod",1)) %>%
@@ -137,9 +121,6 @@ surv_plot <- scenarios %>%
   scale_x_continuous("Time (years)")+
   scale_y_continuous("Survival", limits = c(0,1), labels = scales::percent)#+
 
-# 
-surv_plot
-# 
 all_haz_plot <- 
   scenarios %>%  
   left_join(res, by = "scenario_fit_id") %>%
@@ -163,14 +144,11 @@ all_haz_plot <-
         legend.key.spacing.y = legend_space_y,
         plot.margin = margins) +
   geom_vline(xintercept = c(5), colour = c("gray30"), linewidth = 0.8, linetype = "dashed")+
-  #  geom_vline(xintercept = c(25), colour = c("gray70"))+
   geom_line(linewidth = 0.9)+
   scale_colour_manual("", values = c("firebrick", "green3")) + 
   scale_linetype_manual("",values = c("solid", "dashed")) +
   scale_x_continuous("Time (years)")+
   scale_y_continuous("Hazard", limits = c(0,0.4))
-
-all_haz_plot
 
 title_vec <- c("Single-arm trials\n(a) Weibull mixture")
 
@@ -334,9 +312,7 @@ plot_all_dgm <- plot_grid(
   rel_heights = c(1.08,1.08,1,1),
   ncol = 1)
 
-plot_all_dgm
-
-tiff(file = "plots/single_and_two_arm/figure_dgm_survival_hazard_hr.tiff",   
+tiff(file = "Plots/figure3.tiff",   
      width = 6.2, 
      height = 7.1,
      units = 'in',  

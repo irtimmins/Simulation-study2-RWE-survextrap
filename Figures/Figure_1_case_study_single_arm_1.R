@@ -151,7 +151,7 @@ plot_all_single_arm <- plot_grid(
 
 plot_all_single_arm
 
-tiff(file = "figure1.tiff",   
+tiff(file = "Plots/figure1.tiff",   
      width = 5.8, 
      height = 5.3,
      units = 'in',  
