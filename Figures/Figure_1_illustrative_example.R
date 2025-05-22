@@ -1,4 +1,57 @@
 #########################################################
+# Figure 1, Illustration of structural uncertainty.
+#########################################################
+
+library(ggplot2)
+library(dplyr)
+library(viridis) # for colour palettes
+library(stringr)
+library(gridExtra)
+library(pracma)
+library(tidyr)
+library(flextable)
+library(abind)
+library(cowplot)
+library(magrittr)
+library(purrr)
+library(wrapr)
+library(patchwork)
+library(readr)
+
+# Load datasets.
+load("surv_plots.Rdata") # load survival stats
+load("haz_plots.Rdata") # load hazard stats
+
+summary(surv_plots)
+
+
+surv_df <- surv_plots %>%
+  filter(`External data` == "Trial only",
+         df == 10,
+         `Prior for sigma` == 1,
+         `Extra knots` %in% c("None", "10,15,25"))
+summary(as.factor(surv_df$model_number))
+
+haz_df <- haz_plots %>%
+  filter(`External data` == "Trial only",
+         df == 10,
+         `Prior for sigma` == 1,
+         `Extra knots` %in% c("None", "10,15,25"))
+
+summary(as.factor(haz_df$model_number))
+
+model_without_ek <- models_control[[1]]
+model_without_ek$mspline$knots
+
+model_with_ek <- models_control[[12]]
+model_with_ek$mspline$knots
+
+###############################################
+###############################################
+
+
+
+#########################################################
 # Single arm, manuscript plot with both survival and hazard.
 #########################################################
 
@@ -22,63 +75,29 @@ library(readr)
 load("surv_plots.Rdata") # load survival stats
 load("haz_plots.Rdata") # load hazard stats
 
+# Run case_study_script.R to get models_control.
+knots1 <- models_control[[1]]$mspline$knots
+knots12 <- models_control[[12]]$mspline$knots
+
 colour_fill <- "deepskyblue3"
 colour_KM <- "gray20"
 margins1 <- unit(c(0.0,0.0,0.0,0), "cm")
 margins2 <- unit(c(0.0,0.4,0.0,0), "cm")
-hjust_vec <- c(-0.8/.pt, -4.5/.pt, 1.5/.pt)
+# hjust_vec <- c(-0.8/.pt, -4.5/.pt, 1.5/.pt)
+hjust1 <- c(0/.pt)
+hjust12 <- c(0/.pt)
+title1  <- "(a) Model fitted to trial data, without extra knots"
+title12  <-  "(b) Model fitted to trial data, with extra knots"
 
-dataset <- c("Trial only", 
-             "Trial + Population rates",
-             "Trial + Population rates + Registry")
-
-title_vec <- c("(a) Trial data only",
-               "(b) Trial data and population rates",
-               "(c) Trial, population rates and SEER registry data")
-
-population_data_plot <- function(plot, dataset){
+# Model numbers 1 and 12 from case_study_script.1.
+for(i in c(1,12)){
+  # i <- 12
+  knots <- get(paste0("knots", i))
+  title <- get(paste0("title", i)) 
   
-  bh_label <- tibble(x=37, y=0.078, lab = "Population \nmortality")
-  seer_label <- tibble(x=15, y=0.3, lab = "SEER registry \ndata")
-  
-  if(dataset == "Trial only"){
-    
-    plot 
-    
-  } else if (dataset == "Trial + Population rates") {
-    
-    plot+
-      geom_step(data=cetux_bh %>% filter(time < 40), 
-                aes(x=time, y=hazard), inherit.aes = FALSE, colour="gray30") +
-      geom_text(data = bh_label, aes(x=x, y=y, label = lab), 
-                colour = "gray30", 
-                size = 8/.pt, lineheight = 0.85) 
-    
-  } else if (dataset == "Trial + Population rates + Registry") {
-    
-    plot+
-      geom_step(data=cetux_seer, 
-                aes(x=start, y=haz), inherit.aes = FALSE, colour= "brown4") +
-      geom_step(data=cetux_bh %>% filter(time < 40), 
-                aes(x=time, y=hazard), inherit.aes = FALSE, colour="gray30") +
-      geom_text(data = bh_label, aes(x=x, y=y, label = lab), 
-                size = 8/.pt, colour="gray30", lineheight = 0.85) +
-      geom_text(data = seer_label, aes(x=x, y=y, label = lab), 
-                size = 8/.pt, colour= "brown4", lineheight = 0.85 ) 
-    
-    
-  }
-  
-}
-
-
-
-for(i in 1:3){
-  
- surv_plot_single_arm <- surv_plots %>% 
-    filter(df == 10, prior_rate==1)  %>%
-    filter(`Extra knots` == "10,25") %>%
-    filter(`External data` == dataset[i]) %>%
+  surv_plot_single_arm <-
+  surv_df %>% 
+    filter(model_number == i)  %>%
     ggplot() +
     theme_classic()+
     theme(axis.text.y=element_text(size = 6),
@@ -87,6 +106,7 @@ for(i in 1:3){
           axis.title.x = element_text(size = 8),
           strip.text.x = element_text(size = 4),
           plot.margin = margins1)+
+    geom_vline(xintercept = knots, colour = "gray30", alpha = 0.3)+
     geom_ribbon(aes(x = t, ymin = lower, ymax = upper), fill= colour_fill, alpha = 0.12)+
     geom_line(aes(x=t, y=median), lwd=1, colour = colour_fill) +
     geom_line(aes(x=t, y=lower), linetype = "solid", alpha = 0.2, colour = colour_fill) +
@@ -97,11 +117,8 @@ for(i in 1:3){
     xlab("Time (Years)") + 
     scale_y_continuous("Overall Survival", limits = c(0,1), labels = scales::percent) 
   
-  haz_plot_single_arm <- haz_plots %>% 
-    filter(t > 0, t <= 40) %>%
-    filter(df == 10, prior_rate==1)  %>%
-    filter(`Extra knots` == "10,25") %>%
-    filter(`External data` == dataset[i]) %>%
+  haz_plot_single_arm <- haz_df %>% 
+    filter(model_number == i)  %>%
     ggplot() +
     theme_classic()+
     theme(axis.text.y=element_text(size = 6),
@@ -110,31 +127,28 @@ for(i in 1:3){
           axis.title.x = element_text(size = 8),
           strip.text.x = element_text(size = 4),
           plot.margin = margins2)+
+    geom_vline(xintercept = knots, colour = "gray30", alpha = 0.3)+
     geom_ribbon(aes(x = t, ymin = lower, ymax = upper), fill= colour_fill, alpha = 0.12)+
     geom_line(aes(x=t, y=median), lwd=1, colour = colour_fill) +
     geom_line(aes(x=t, y=lower), linetype = "solid", alpha = 0.2, colour = colour_fill) +
     geom_line(aes(x=t, y=upper), linetype = "solid", alpha = 0.2, colour = colour_fill) +
-    geom_vline(xintercept = max(control$years), colour = "gray30", linetype = "dashed")#%.>%
-  
-  haz_plot_single_arm <- haz_plot_single_arm %.>%
-    population_data_plot(plot = ., dataset = dataset[i]) +
+    geom_vline(xintercept = max(control$years), colour = "gray30", linetype = "dashed")  +
     xlab("Time (Years)") + 
     scale_y_continuous("Hazard", limits = c(0, 0.75))
-  
   
   assign(paste0("surv_plot_single_arm", i), surv_plot_single_arm)
   assign(paste0("haz_plot_single_arm", i), haz_plot_single_arm)
   
   plot_surv_haz_single_arm <- surv_plot_single_arm + 
-    theme(plot.title = element_text(hjust = hjust_vec[i],
+    theme(plot.title = element_text(hjust = get(paste0("hjust",i)),
                                     size=8, face="bold",
                                     lineheight = 1.2),
           plot.tag = element_text(size = 8))+
-    labs(title = title_vec[i])+
+    labs(title = title)+
     haz_plot_single_arm +
     plot_layout(nrow = 1, ncol = 2)
   
-  #plot_surv_haz_single_arm 
+  plot_surv_haz_single_arm 
   assign(paste0("plot_surv_haz_single_arm", i), plot_surv_haz_single_arm)
   
 }
@@ -142,21 +156,19 @@ for(i in 1:3){
 plot_all_single_arm <- plot_grid(
   plot_surv_haz_single_arm1,
   NULL,
-  plot_surv_haz_single_arm2,
-  NULL,
-  plot_surv_haz_single_arm3,
+  plot_surv_haz_single_arm12,
   align = "hv",
-  rel_heights = c(1,-0.05,1,-0.05,1),
+  rel_heights = c(1,-0.02, 1),
   ncol = 1)
 
 plot_all_single_arm
 
-tiff(file = "Plots/figure1.tiff",   
+pdf(file = "Figure1_spline_illustration.pdf",   
      width = 5.8, 
-     height = 5.3,
-     units = 'in',  
-     res = 300, 
-     compression = "lzw")
+     height = 3.8)  
 print(plot_all_single_arm)
 dev.off()
 
+ggsave("Figure1_spline_illustration.svg",
+       width = 5.8, 
+       height = 3.8)  

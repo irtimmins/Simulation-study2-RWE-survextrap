@@ -1,62 +1,17 @@
-# If running interactively, you cannot get all models into memory you need 64Gb of memory
-# (or remove models once their summary stats have been calculated)
+################################################################################
+## Two-arm modelling
+################################################################################
 
-rm(list=ls())
+# Load datasets from Bonner trial. 
 
-library(survextrap)
-library(ggplot2)
-library(dplyr)
-library(viridis) # for colour palettes
-library(memoise)
-library(stringr)
-library(gridExtra)
-library(pracma)
-library(tidyr)
-library(flextable)
-library(abind)
-library(cowplot)
-library(magrittr)
-library(purrr)
-library(wrapr)
-library(patchwork)
-library(readr)
+# Control and Cetuximab arms.
+control <- readRDS("Data/Bonner_control.RDS")
+cetuximab <- readRDS("Data/Bonner_active.RDS")
 
-user <- Sys.info()["user"]
+# Both arms data.
+cetux <- readRDS("Data/Bonner_all.RDS")
 
-# Load rmst_fast and irmst_fast.
-
-source("R/functions.R")
-
-# Data 
-control <- cetux[cetux$treat=="Control",]
-cetuximab <- cetux[cetux$treat=="Cetuximab",]
-
-theme_paper <- function(){ 
-  
-  theme_classic() + 
-    theme(
-      plot.title = element_text(hjust = 0.5, size=20),
-      legend.position = "right",
-      #legend.position.inside = c(0.6, 0.95),
-      legend.text = element_text(size = 14),
-      legend.title = element_text(size = 14),
-      axis.title = element_text(size = 20),
-      axis.text = element_text(size = 14),
-      strip.text = element_text(size = 20, color = "dark green")
-      
-    )
-}
-
-theme_paper2 <- function(){
-  theme(axis.text.y=element_text(size = 6),
-        axis.title.y=element_text(size = 8),
-        axis.text.x = element_text(size = 6),
-        axis.title.x = element_text(size = 8),
-        strip.text.x = element_text(size = 4))
-}
-
-
-# KM
+# Derive Kaplan-Meier curves of Bonner trial.
 # Both arms
 survminer::ggsurvplot(survfit(Surv(years, d) ~ treat, data=cetux)) + xlab("Years")
 # Control
@@ -66,449 +21,17 @@ km_cetux <- survminer::ggsurvplot(survfit(Surv(years, d) ~ 1, data=cetuximab))$d
 
 tmax <- max(cetux$years)
 
-# Whether to run single arm models or load in predictions from disk
-run_single_arm_models <- FALSE
+# Derive priors.
+mspline_base <- mspline_spec(Surv(years, d) ~ 1, data=cetux, df=10)
+prior_hscale <- p_meansurv(median=25, upper=100, mspline=mspline_base) # prior for the baseline log hazard scale parameter. We'll leave this untouched once calculated (from 10df mspline)
+prior_haz_const(mspline_base, prior_hscale = prior_hscale)
+
+## Just considering models with no extra knots, and models with extra knots at 10, 15 and 25 years
 
 # Whether to run two arm models or load in predictions from disk
 run_two_arm_models <- FALSE
 
 
-# Prior specification
-mspline_base <- mspline_spec(Surv(years, d) ~ 1, data=cetux, df=10)
-prior_hscale <- p_meansurv(median=25, upper=100, mspline=mspline_base) # prior for the baseline log hazard scale parameter. We'll leave this untouched once calculated (from 10df mspline)
-prior_haz_const(mspline_base, prior_hscale = prior_hscale)
-
-# memoise
-survextrap_mem <- memoise(survextrap, cache = cachem::cache_disk(dir = ".cache",
-                                                                 max_age = 31557600, # keep for 1-year
-                                                                 max_size = 2e10)) # 20Gb of space 
-rmst_mem <- memoise(rmst_fast, cache = cachem::cache_disk(dir = ".cache",
-                                                     max_age = 31557600,
-                                                     max_size = 2e10))
-irmst_mem <- memoise(irmst_fast, cache = cachem::cache_disk(dir = ".cache",
-                                                     max_age = 31557600,
-                                                     max_size = 2e10))
-survival_mem <- memoise(survival, cache = cachem::cache_disk(dir = ".cache",
-                                                             max_age = 31557600,
-                                                             max_size = 2e10))
-hazard_mem <- memoise(hazard, cache = cachem::cache_disk(dir = ".cache",
-                                                         max_age = 31557600,
-                                                         max_size = 2e10))
-hazard_ratio_mem <- memoise(hazard_ratio, cache = cachem::cache_disk(dir = ".cache",
-                                                         max_age = 31557600,
-                                                         max_size = 2e10))
-
-### Running models
-options(mc.cores = 1) 
-# options(mc.cores = parallel::detectCores())
-chains <- 4; iter <- 2000
-smooth_model <- "exchangeable"
-
-########################################################################################
-# Single arm models (Control arm only)
-if(run_single_arm_models){
-  models_control <- list()
-  # We define the default model and investigate 1-way sensitivity analyses to this set-up
-  df_base <- 10 # degrees of freedom
-  ek_base <- NULL # extra knots after end of trial follow-up
-  l_base <- 1 # rate for sigma prior 
-  prior_hsd_base <- p_gamma(2, l_base) # changing prior for sigma parameter
-  mspline_base <- mspline_spec(Surv(years, d) ~ 1, data=cetux, df=df_base, add_knots=ek_base)
-  external_data_base <- "Trial only" # no background rates and no SEER data for default
-  external_base <- NULL
-  backhaz_base <- NULL
-  models_control[[paste0("df=",df_base,"; extra_knots=", ek_base,"; prior_rate=", l_base, 
-                         "; external_data=", external_data_base)]] <- 
-    survextrap_mem(Surv(years, d) ~ 1, data=control, mspline=mspline_base,
-                   chains=chains, iter=iter,
-                   prior_hscale=prior_hscale, prior_hsd = prior_hsd_base,
-                   external=external_base, 
-                   backhaz=backhaz_base,
-                   smooth_model = smooth_model)
-  
-  # loop over no. df for trial data
-  for(df in c(3,6,10)){
-    print(paste("df=", df))
-    mspline <- mspline_spec(Surv(years, d) ~ 1, data=cetux, df=df, add_knots=ek_base)
-    models_control[[paste0("df=",df,"; extra_knots=", ek_base,"; prior_rate=", l_base,
-                           "; external_data=", external_data_base)]] <- 
-      survextrap_mem(Surv(years, d) ~ 1, data=control, mspline=mspline,
-                     chains=chains, iter=iter,
-                     prior_hscale=prior_hscale, prior_hsd = prior_hsd_base,
-                     external=external_base, 
-                     backhaz=backhaz_base,
-                     smooth_model = smooth_model
-      )
-  }
-  
-  
-  # extra knots, for trial data alone, trial data+BH, trial data+BH+seer
-  extra_knots <- list(NULL, 25, c(10, 25), c(10, 15, 25))
-  external_data <- c("Trial only", "Trial + Population rates", "Trial + Population rates + Registry")
-  for(ek in extra_knots){
-    for(ed in external_data){
-      print(paste("extra knots=",paste(ek, collapse=",")))
-      # Spline specification
-      mspline <- mspline_spec(Surv(years, d) ~ 1, data=cetux, df=df_base, add_knots=ek)
-      
-      # external data
-      if(ed == "Trial + Population rates + Registry"){
-        external <- cetux_seer
-        backhaz <- cetux_bh
-      } else if(ed == "Trial + Population rates"){
-        external <- NULL   
-        backhaz <- cetux_bh
-      } else if(ed == "Trial only"){
-        external <- NULL
-        backhaz <- NULL
-      } else stop("Options of external data do not match")
-      models_control[[paste0("df=",df_base,"; extra_knots=", paste(ek, collapse=","),"; prior_rate=", l_base,
-                             "; external_data=", ed)]] <-  
-        survextrap_mem(Surv(years, d) ~ 1, data=control, mspline=mspline,
-                       chains=chains, iter=iter,
-                       prior_hscale=prior_hscale, prior_hsd = prior_hsd_base,
-                       external=external, 
-                       backhaz=backhaz,
-                       smooth_model = smooth_model
-        )
-    }
-  }
-  
-  # priors (trial data only)
-  for(l in c(1, 5, 20)){ # changing prior for sigma parameter
-    print(paste("prior rate=", l))
-    prior_hsd <- p_gamma(2, l) 
-    
-    models_control[[paste0("df=",df_base,"; extra_knots=", ek_base,"; prior_rate=", l,
-                           "; external_data=", external_data_base)]] <- 
-      survextrap_mem(Surv(years, d) ~ 1, data=control, mspline=mspline_base,
-                     chains=chains, iter=iter,
-                     prior_hscale=prior_hscale, prior_hsd = prior_hsd,
-                     external=external_base, 
-                     backhaz=backhaz_base,
-                     smooth_model = smooth_model
-      )
-  }
-  
-  
-  
-  ############################################
-  # LOOIC stats from trial data only
-  looic <- data.frame()
-  for(k in seq_along(models_control)){
-    print(k)
-    name <- names(models_control)[k]
-    # Use a regular expression to extract the number following "df="
-    df <- as.numeric(str_extract(name, "(?<=df=)[^;]+"))
-    ek <- str_extract(name, "(?<=extra_knots=)[^;]+")
-    prior_rate <- as.numeric(str_extract(name, "(?<=prior_rate=)[^;]+"))
-    ed <- str_extract(name, "(?<=external_data=)[^;]+")
-    
-    if(ed == "Trial only"){
-      looic <- rbind(looic,
-                     data.frame(df = df, ek = ek, prior_rate = prior_rate, ed = ed,
-                                looic = models_control[[k]]$loo$estimates["looic","Estimate"],
-                                rmst_mem(models_control[[k]], t=5))
-      )
-    }                                  
-  }
-  save(looic, file =  "looic.Rdata") # save looic stats to disk
-
-  # rmst metrics at 40 years
-  rmst_control <- data.frame()
-  for(k in seq_along(models_control)){
-    print(k)
-    name <- names(models_control)[k]
-    # Use a regular expression to extract the number following "df="
-    df <- as.numeric(str_extract(name, "(?<=df=)[^;]+"))
-    ek <- str_extract(name, "(?<=extra_knots=)[^;]+")
-    prior_rate <- as.numeric(str_extract(name, "(?<=prior_rate=)[^;]+"))
-    ed <- str_extract(name, "(?<=external_data=)[^;]+")
-    
-    rmst_control <- rbind(rmst_control,
-                          data.frame(df = df, ek = ek, prior_rate = prior_rate, ed = ed,
-                                     rmst_mem(models_control[[k]], t=40))
-    )
-  }
-  save(rmst_control, file =  "rmst_control.Rdata") # save rmst stats to disk
- # saveRDS(haz_plot, paste0("plots/single_arm/hazard_plot",i,".rds"))
-  
-  
-  
-  # survival metrics
-  surv_plots <- data.frame()
-  for(k in seq_along(models_control)){
-    print(k)
-    name <- names(models_control)[k]
-    # Use a regular expression to extract the number following "df="
-    df <- as.numeric(str_extract(name, "(?<=df=)[^;]+"))
-    ek <- str_extract(name, "(?<=extra_knots=)[^;]+")
-    prior_rate <- as.numeric(str_extract(name, "(?<=prior_rate=)[^;]+"))
-    ed <- str_extract(name, "(?<=external_data=)[^;]+")
-    
-    surv_plots <- rbind(surv_plots,
-                        data.frame(df = df, ek = ek, prior_rate = prior_rate, ed = ed,
-                                   survival_mem(models_control[[k]], tmax=40))
-    )
-    
-  }
-  surv_plots$df <- factor(surv_plots$df)
-  surv_plots$`Extra knots` <- factor(ifelse(is.na(surv_plots$ek), "None", surv_plots$ek))
-  surv_plots$`Prior for sigma` <- factor(surv_plots$prior_rate)
-  surv_plots$`External data` <- factor(surv_plots$ed, levels = c("Trial only", "Trial + Population rates", "Trial + Population rates + Registry"))
-  save(surv_plots, file =  "surv_plots.Rdata") # save survival stats to disk
-  
-  # hazard metrics
-  haz_plots <- data.frame()
-  for(k in seq_along(models_control)){
-    print(k)
-    name <- names(models_control)[k]
-    # Use a regular expression to extract the number following "df="
-    df <- as.numeric(str_extract(name, "(?<=df=)[^;]+"))
-    ek <- str_extract(name, "(?<=extra_knots=)[^;]+")
-    prior_rate <- as.numeric(str_extract(name, "(?<=prior_rate=)[^;]+"))
-    ed <- str_extract(name, "(?<=external_data=)[^;]+")
-    
-    haz_plots <- rbind(haz_plots,
-                       data.frame(df = df, ek = ek, prior_rate = prior_rate, ed=ed,
-                                  hazard_mem(models_control[[k]], t=c(seq(0,6,length=100),7:40)))
-    )
-    
-  }
-  haz_plots$df <- factor(haz_plots$df)
-  haz_plots$`Extra knots` <- factor(ifelse(is.na(haz_plots$ek), "None", haz_plots$ek))
-  haz_plots$`Prior for sigma` <- factor(haz_plots$prior_rate)
-  haz_plots$`External data` <- factor(haz_plots$ed, levels = c("Trial only", "Trial + Population rates", "Trial + Population rates + Registry"))
-  save(haz_plots, file =  "haz_plots.Rdata") # save hazard stats to disk
-  
-} else {
-  load("looic.Rdata") # load looic stats 
-  load("surv_plots.Rdata") # load survival stats
-  load("haz_plots.Rdata") # load hazard stats
-  load("rmst_control.Rdata") # load rmst stats
-  
-}
-
-
-
-
-############################################
-# Survival Plots
-############################################
-
-# Varying number of degrees of freedom (Trial only)
-s1 <- ggplot(surv_plots %>% filter(`Extra knots` == "None" & prior_rate==1 & `External data` == "Trial only")) +
-  geom_line(aes(x=t, y=median, 
-                col=df), lwd=1.3) +
-  geom_line(aes(x=t, y=lower, col=df), linetype = "dashed") +
-  geom_line(aes(x=t, y=upper, col=df), linetype = "dashed") +
-  geom_step(data=km_control, aes(x=time, y=surv), lwd=1.3,
-            inherit.aes = FALSE) +
-  xlab("Time (Years)") + 
-  scale_y_continuous("Overall Survival", limits = c(0,1), labels = scales::percent) +
-  geom_vline(xintercept = max(control$years)) +
-  ggtitle("(a) Varying number of degrees of freedom") +
-  theme_classic()+
-  theme_paper2()+
-  theme(plot.title = element_text(hjust = 0,
-                                  size=10,
-                                  face="bold",
-                                  lineheight = 1.2))
-s1
-# Varying number of extra knots (Trial only)
-# s2 <- ggplot(surv_plots %>% filter(df == 10 & prior_rate==1 & `External data` == "Trial only")) +
-#   geom_line(aes(x=t, y=median, 
-#                 col=`Extra knots`), lwd=1.3) +
-#   geom_line(aes(x=t, y=lower, col=`Extra knots`), linetype = "dashed") +
-#   geom_line(aes(x=t, y=upper, col=`Extra knots`), linetype = "dashed") +
-#   geom_step(data=km_control, aes(x=time, y=surv), lwd=1.3,
-#             inherit.aes = FALSE) +
-#   xlab("Time (Years)") + 
-#   scale_y_continuous("Overall Survival", limits = c(0,1), labels = scales::percent) +
-#   geom_vline(xintercept = max(control$years)) +
-#   ggtitle("(b) Varying extra knot locations after trial follow-up")+
-#   theme_classic()+
-#   theme_paper2()+
-#   theme(plot.title = element_text(hjust = 0))
-# s2
-# Varying prior for sigma (Trial only)
-s2 <- ggplot(surv_plots %>% filter(df == 10 & `Extra knots` == "None" & `External data` == "Trial only")) +
-  geom_line(aes(x=t, y=median, 
-                col=`Prior for sigma`), lwd=1.3) +
-  geom_line(aes(x=t, y=lower, col=`Prior for sigma`), linetype = "dashed") +
-  geom_line(aes(x=t, y=upper, col=`Prior for sigma`), linetype = "dashed") +
-  geom_step(data=km_control, aes(x=time, y=surv), lwd=1.3,
-            inherit.aes = FALSE) +
-  xlab("Time (Years)") + 
-  scale_y_continuous("Overall Survival", limits = c(0,1), labels = scales::percent) +
-  geom_vline(xintercept = max(control$years)) +
-  ggtitle("(b) Varying prior for sigma")+
-  theme_classic()+
-  theme_paper2()+
-  theme(plot.title = element_text(hjust = 0,
-                                  size=10,
-                                  face="bold",
-                                  lineheight = 1.2))
-
-
-plot_single_sensitivity <- plot_grid(s1, s2, ncol=1, align = "hv")
-
-tiff(file = "figure_survival_cetux_single_arm_sensitivity.tiff",   
-     width = 5.8, 
-     height = 4.5,
-     units = 'in',  
-     res = 300, 
-     compression = "lzw")
-print(plot_single_sensitivity)
-dev.off()
-
-
-
-############## 
-# Survival varying extra knots across trial only, trial + BH, trial + BH + seer
-s4 <- ggplot(surv_plots %>% filter(df == 10 & prior_rate==1)) +
-  geom_line(aes(x=t, y=median, 
-                col=`Extra knots`), lwd=1.3) +
-  geom_line(aes(x=t, y=lower, col=`Extra knots`), linetype = "dashed") +
-  geom_line(aes(x=t, y=upper, col=`Extra knots`), linetype = "dashed") +
-  facet_wrap(~`External data`, nrow = 3) +
-  geom_step(data=km_control, aes(x=time, y=surv), lwd=1.3,
-            inherit.aes = FALSE) +
-  xlab("Time (Years)") + 
-  scale_y_continuous("Overall Survival", limits = c(0,1), labels = scales::percent) +
-  geom_vline(xintercept = max(control$years)) +
- # ggtitle("Varying extra knot locations after trial follow-up")+
-  theme_classic()+
-  theme_paper2()+
-  theme(plot.title = element_text(hjust = 0))+
-  theme(axis.title.x = element_text(size = 8),
-        strip.text.x = element_text(size = 10))+  
-  theme(panel.border = element_rect(fill = NA, 
-                                    colour = "grey20"))
-s4
-
-tiff(file = "figure_survival_cetux_single_arm_sensitivity_knots.tiff",   
-     width = 5.8, 
-     height = 5.3,
-     units = 'in',  
-     res = 300, 
-     compression = "lzw")
-print(s4)
-dev.off()
-
-
-############################################
-# Hazard Plots
-
-# Varying number of degrees of freedom
-h1 <- ggplot(haz_plots %>% filter(`Extra knots` == "None" & prior_rate==1 & `External data` == "Trial only")) +
-  geom_line(aes(x=t, y=median, 
-                col=df), lwd=1.3) +
-  geom_line(aes(x=t, y=lower, col=df), linetype = "dashed") +
-  geom_line(aes(x=t, y=upper, col=df), linetype = "dashed") +
-  xlab("Time (Years)") + 
-  ylab("Hazard") +
-  geom_vline(xintercept = max(control$years)) +
-  ggtitle("(a) Varying number of degrees of freedom") +
-  theme_classic()+
-  theme_paper2()+
-  theme(plot.title = element_text(hjust = 0))
-h1
-# Varying number of extra knots
-h2 <- ggplot(haz_plots %>% filter(df == 10 & prior_rate==1 & `External data` == "Trial only")) +
-  geom_line(aes(x=t, y=median, 
-                col=`Extra knots`), lwd=1.3) +
-  geom_line(aes(x=t, y=lower, col=`Extra knots`), linetype = "dashed") +
-  geom_line(aes(x=t, y=upper, col=`Extra knots`), linetype = "dashed") +
-  xlab("Time (Years)") + 
-  ylab("Hazard") +
-  geom_vline(xintercept = max(control$years)) +
-  ggtitle("(b) Varying extra knot locations after trial follow-up")+
-  theme_classic()+
-  theme_paper2()+
-  theme(plot.title = element_text(hjust = 0))
-h2
-# Varying prior for sigma
-h3 <- ggplot(haz_plots %>% filter(df == 10 & `Extra knots` == "None" & `External data` == "Trial only")) +
-  geom_line(aes(x=t, y=median, 
-                col=`Prior for sigma`), lwd=1.3) +
-  geom_line(aes(x=t, y=lower, col=`Prior for sigma`), linetype = "dashed") +
-  geom_line(aes(x=t, y=upper, col=`Prior for sigma`), linetype = "dashed") +
-  xlab("Time (Years)") + 
-  ylab("Hazard") +
-  geom_vline(xintercept = max(control$years)) +
-  ggtitle("(c) Varying prior for sigma")+
-  theme_classic()+
-  theme_paper2()+
-  theme(plot.title = element_text(hjust = 0))
-h3
-
-plot_single_sensitivity_hazard <- plot_grid(h1, h2, h3, ncol=1, align = "hv")
-
-
-tiff(file = "figure_hazard_cetux_single_arm_sensitivity.tiff",   
-     width = 5.8, 
-     height = 5.3,
-     units = 'in',  
-     res = 300, 
-     compression = "lzw")
-print(plot_single_sensitivity_hazard)
-dev.off()
-
-
-
-################################ 
-# Hazard varying extra knots across trial only, trial + BH, trial + BH + seer
-cetux_seer_plot <- cbind(cetux_seer, `External data` =  factor("Trial + Population rates + Registry", levels = c("Trial only", "Trial + Population rates", "Trial + Population rates + Registry")))
-cetux_bh_plot <- rbind(
-  cbind(cetux_bh, `External data` =  factor("Trial + Population rates", levels = c("Trial only", "Trial + Population rates", "Trial + Population rates + Registry"))),
-  cbind(cetux_bh, `External data` =  factor("Trial + Population rates + Registry", levels = c("Trial only", "Trial + Population rates", "Trial + Population rates + Registry")))
-)
-bh_text <- tibble(x=35, y=0.1, lab = "Population mortality",
-                      `External data` =  factor(c("Trial + Population rates + Registry", "Trial + Population rates"), levels = c("Trial only", "Trial + Population rates", "Trial + Population rates + Registry")))
-seer_text <- tibble(x=20, y=0.3, lab = "Registry data",
-                  `External data` =  factor(c("Trial + Population rates + Registry"), levels = c("Trial only", "Trial + Population rates", "Trial + Population rates + Registry")))
-
-h4 <- ggplot(haz_plots %>% filter(df == 10 & prior_rate==1)) +
-  geom_line(aes(x=t, y=median, 
-                col=`Extra knots`), lwd=1.3) +
-  geom_line(aes(x=t, y=lower, col=`Extra knots`), linetype = "dashed") +
-  geom_line(aes(x=t, y=upper, col=`Extra knots`), linetype = "dashed") +
-  geom_step(data=cetux_seer_plot, 
-            aes(x=start, y=haz), inherit.aes = FALSE) +
-  geom_step(data=cetux_bh_plot %>% filter(time < 40), 
-            aes(x=time, y=hazard), inherit.aes = FALSE, colour="darkgrey") +
-  geom_text(data = bh_text, aes(x=x, y=y, label = lab), colour="darkgrey") +
-  geom_text(data = seer_text, aes(x=x, y=y, label = lab)) +
-  facet_wrap(~`External data`, ncol = 1) +
-  xlab("Time (Years)") + 
-  ylab("Hazard") +
-  geom_vline(xintercept = max(control$years), colour = "gray30", linetype = "dashed")+
- # ggtitle("Varying extra knot locations after trial follow-up")+
-  theme_classic()+
-  theme_paper2()+
-  theme(plot.title = element_text(hjust = 0))+
-  theme(axis.title.x = element_text(size = 8),
-        strip.text.x = element_text(size = 10))+  
-  theme(panel.border = element_rect(fill = NA, 
-                                    colour = "grey20"))
-h4
-
-tiff(file = "figure_hazard_cetux_single_arm_sensitivity_knots.tiff",   
-     width = 5.8, 
-     height = 5.3,
-     units = 'in',  
-     res = 300, 
-     compression = "lzw")
-print(h4)
-dev.off()
-
-
-
-
-################################################################################
-## Two-arm modelling
-## Just considering models with no extra knots, and models with extra knots at 10, 15 and 25 years
 if(run_two_arm_models){
   two_arm_models <- list()
   models_cetux <- list()
@@ -761,8 +284,8 @@ if(run_two_arm_models){
     ed <- str_extract(name, "(?<=external_data=)[^;]+")
     
     surv_plots_cetux <- rbind(surv_plots_cetux,
-                                 data.frame(df = df, ek = ek, prior_rate = prior_rate, ed = ed,
-                                            survival_mem(models_cetux[[k]], tmax=40))
+                              data.frame(df = df, ek = ek, prior_rate = prior_rate, ed = ed,
+                                         survival_mem(models_cetux[[k]], tmax=40))
     )
     
   }
@@ -771,7 +294,7 @@ if(run_two_arm_models){
   surv_plots_cetux$`Prior for sigma` <- factor(surv_plots_cetux$prior_rate)
   surv_plots_cetux$`External data` <- factor(surv_plots_cetux$ed, levels = c("Trial only", "Trial + Population rates", "Trial + Population rates + Registry"))
   save(surv_plots_cetux, file =  "surv_plots_cetux.Rdata") # save survival stats to disk
-
+  
   #########################################
   ## Hazard plots
   haz_plots_two_arms <- data.frame()
@@ -786,8 +309,8 @@ if(run_two_arm_models){
     ed <- str_extract(name, "(?<=external_data=)[^;]+")
     
     haz_plots_two_arms <- rbind(haz_plots_two_arms,
-                                 data.frame(model = model, df = df, ek = ek, prior_rate = prior_rate, ed = ed,
-                                            hazard_mem(two_arm_models[[k]], tmax=40))
+                                data.frame(model = model, df = df, ek = ek, prior_rate = prior_rate, ed = ed,
+                                           hazard_mem(two_arm_models[[k]], tmax=40))
     )
     
   }
@@ -810,8 +333,8 @@ if(run_two_arm_models){
     ed <- str_extract(name, "(?<=external_data=)[^;]+")
     
     haz_plots_cetux <- rbind(haz_plots_cetux,
-                              data.frame(df = df, ek = ek, prior_rate = prior_rate, ed = ed,
-                                         hazard_mem(models_cetux[[k]], tmax=40))
+                             data.frame(df = df, ek = ek, prior_rate = prior_rate, ed = ed,
+                                        hazard_mem(models_cetux[[k]], tmax=40))
     )
     
   }
@@ -836,8 +359,8 @@ if(run_two_arm_models){
     ed <- str_extract(name, "(?<=external_data=)[^;]+")
     
     haz_ratio_plots <- rbind(haz_ratio_plots,
-                                data.frame(model = model, df = df, ek = ek, prior_rate = prior_rate, ed = ed,
-                                           hazard_ratio_mem(two_arm_models[[k]], tmax=40))
+                             data.frame(model = model, df = df, ek = ek, prior_rate = prior_rate, ed = ed,
+                                        hazard_ratio_mem(two_arm_models[[k]], tmax=40))
     )
     
   }
@@ -865,7 +388,7 @@ if(run_two_arm_models){
   haz_ratio_plots$`External data` <- factor(haz_ratio_plots$ed, levels = c("Trial only", "Trial + Population rates", "Trial + Population rates + Registry"))
   save(haz_ratio_plots, file =  "haz_ratio_plots.Rdata") # save hazard ratio stats to disk
   
-    
+  
 } else{
   # Load from single arms too.
   load("surv_plots.Rdata") # load survival stats
@@ -888,14 +411,14 @@ surv_plots_combined <-
   rbind(surv_plots_two_arms,
         surv_plots %>% mutate(model = "Separate fits", treat="Control"),
         surv_plots_cetux %>% mutate(model = "Separate fits", treat="Cetuximab")                           
-) %>%
+  ) %>%
   mutate(model = factor(model, levels = c("PH", "NPH", "Separate fits"),
                         labels = c("Proportional \nhazards", 
                                    "Non-proportional \nhazards",
                                    "Separate arms"))) %>%
   mutate("External data" = factor(ed, levels = c("Trial only", "Trial + Population rates", "Trial + Population rates + Registry"),
-                     labels = c("Trial only", "Trial + \nPopulation rates", "Trial + \nPopulation rates + \nRegistry")))
-                          
+                                  labels = c("Trial only", "Trial + \nPopulation rates", "Trial + \nPopulation rates + \nRegistry")))
+
 s5 <- ggplot(surv_plots_combined %>% filter(df == 10 & prior_rate==1 & `Extra knots`!="10,25")) +
   geom_line(aes(x=t, y=median, 
                 col=`Extra knots`, linetype = treat), lwd=1, alpha = 0.7) +
@@ -919,13 +442,13 @@ s5 <- ggplot(surv_plots_combined %>% filter(df == 10 & prior_rate==1 & `Extra kn
         legend.position = "bottom",
         legend.title=element_text(size=10,
                                   margin = unit(c(0.0,0.2,0.0,0), "cm")),
-         legend.text = element_text(size=8),
-         legend.spacing.x = unit(0.1, 'cm'),
-         legend.margin = margin(unit(4*c(1,1,1,1), "cm")),
-          legend.box.margin = unit(c(0.0,0.2,0.0,0), "cm"), 
-         legend.background = element_rect(linetype = 1, 
-                                          linewidth = 0.5, 
-                                          colour = "gray30"))+
+        legend.text = element_text(size=8),
+        legend.spacing.x = unit(0.1, 'cm'),
+        legend.margin = margin(unit(4*c(1,1,1,1), "cm")),
+        legend.box.margin = unit(c(0.0,0.2,0.0,0), "cm"), 
+        legend.background = element_rect(linetype = 1, 
+                                         linewidth = 0.5, 
+                                         colour = "gray30"))+
   guides(linetype  = guide_legend(order = 1))
 
 s5
@@ -943,7 +466,7 @@ dev.off()
 # Hazard varying extra knots across trial only, trial + BH, trial + BH + seer
 haz_plots_combined <- rbind(haz_plots_two_arms,
                             haz_plots %>% mutate(model = "Separate fits", treat="Control"),
-                             haz_plots_cetux %>% mutate(model = "Separate fits", treat="Cetuximab")
+                            haz_plots_cetux %>% mutate(model = "Separate fits", treat="Cetuximab")
 ) %>%
   mutate(model = factor(model, levels = c("PH", "NPH", "Separate fits"),
                         labels = c("Proportional \nhazards", 
@@ -968,14 +491,14 @@ cetux_bh_plot_two_arm <- rbind(
 
 #cetux_bh_plot_two_arm
 bh_text_two_arm <- tibble(x=35, y=0.06, lab = "Population \nmortality",
-                  `External data` =  factor(c("Trial + Population rates", "Trial + Population rates + Registry"), 
-                                            levels = c("Trial only", "Trial + Population rates", "Trial + Population rates + Registry"),
-                                            labels = c("Trial only", "Trial + \nPopulation rates", "Trial + \nPopulation rates + \nRegistry")))
+                          `External data` =  factor(c("Trial + Population rates", "Trial + Population rates + Registry"), 
+                                                    levels = c("Trial only", "Trial + Population rates", "Trial + Population rates + Registry"),
+                                                    labels = c("Trial only", "Trial + \nPopulation rates", "Trial + \nPopulation rates + \nRegistry")))
 #bh_text_two_arm
 seer_text_two_arm <- tibble(x=20, y=0.3, lab = "Registry data",
-                    `External data` =  factor("Trial + Population rates + Registry", 
-                                              levels = c("Trial only", "Trial + Population rates", "Trial + Population rates + Registry"),
-                                              labels = c("Trial only", "Trial + \nPopulation rates", "Trial + \nPopulation rates + \nRegistry")))
+                            `External data` =  factor("Trial + Population rates + Registry", 
+                                                      levels = c("Trial only", "Trial + Population rates", "Trial + Population rates + Registry"),
+                                                      labels = c("Trial only", "Trial + \nPopulation rates", "Trial + \nPopulation rates + \nRegistry")))
 
 
 h5 <- ggplot(haz_plots_combined %>% filter(df == 10 & prior_rate==1 & `Extra knots`!="5,10,25")) +
@@ -1090,7 +613,7 @@ irmst_two_arms %>%
 
 irmst_two_arms %>% 
   mutate(irmst = sprintf("%.2f (%.2f, %.2f)", round(median,2), 
-                 round(lower,2), round(upper,2))) %>%
+                         round(lower,2), round(upper,2))) %>%
   select(-c(df, prior_rate, variable, t, median, lower, upper)) %>%
   pivot_wider(names_from = ed, values_from = irmst) %>%
   mutate(model = factor(model, levels = c("PH", "NPH", "Separate fits"))) %>%
@@ -1104,11 +627,7 @@ irmst_two_arms %>%
                  values = c("", "Difference in 40-year RMST (years)"),
                  
   ) %>% 
-  # perhaps avoid saving binary files to repository.
-  # save_as_docx(path = "aim2-tables/cetux_case_study_irmst.docx")
   save_as_docx(path = "cetux_case_study_irmst.docx")
-
-
 
 
 
