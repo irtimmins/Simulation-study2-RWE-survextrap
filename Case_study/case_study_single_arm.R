@@ -19,19 +19,9 @@ library(wrapr)
 library(patchwork)
 library(readr)
 
-user <- Sys.info()["user"]
-
 # Load rmst_fast and irmst_fast.
 
-source("Functions/functions.R")
-
-# Load datasets from Bonner trial. 
-# Control and Cetuximab arms.
-control <- readRDS("Data/Bonner_control.RDS")
-cetuximab <- readRDS("Data/Bonner_active.RDS")
-
-# Both arms data.
-cetux <- readRDS("Data/Bonner_all.RDS")
+source("Functions/case_study_functions.R")
 
 ########################################################################################
 # Single arm models (Control arm only)
@@ -59,7 +49,6 @@ tmax <- max(cetux$years)
 mspline_base <- mspline_spec(Surv(years, d) ~ 1, data=cetux, df=10)
 prior_hscale <- p_meansurv(median=25, upper=100, mspline=mspline_base) # prior for the baseline log hazard scale parameter. We'll leave this untouched once calculated (from 10df mspline)
 prior_haz_const(mspline_base, prior_hscale = prior_hscale)
-
 
 ### Running models
 options(mc.cores = 1) 
@@ -281,23 +270,7 @@ s1 <- ggplot(surv_plots %>% filter(`Extra knots` == "None" & prior_rate==1 & `Ex
                                   face="bold",
                                   lineheight = 1.2))
 s1
-# Varying number of extra knots (Trial only)
-# s2 <- ggplot(surv_plots %>% filter(df == 10 & prior_rate==1 & `External data` == "Trial only")) +
-#   geom_line(aes(x=t, y=median, 
-#                 col=`Extra knots`), lwd=1.3) +
-#   geom_line(aes(x=t, y=lower, col=`Extra knots`), linetype = "dashed") +
-#   geom_line(aes(x=t, y=upper, col=`Extra knots`), linetype = "dashed") +
-#   geom_step(data=km_control, aes(x=time, y=surv), lwd=1.3,
-#             inherit.aes = FALSE) +
-#   xlab("Time (Years)") + 
-#   scale_y_continuous("Overall Survival", limits = c(0,1), labels = scales::percent) +
-#   geom_vline(xintercept = max(control$years)) +
-#   ggtitle("(b) Varying extra knot locations after trial follow-up")+
-#   theme_classic()+
-#   theme_paper2()+
-#   theme(plot.title = element_text(hjust = 0))
-# s2
-# Varying prior for sigma (Trial only)
+
 s2 <- ggplot(surv_plots %>% filter(df == 10 & `Extra knots` == "None" & `External data` == "Trial only")) +
   geom_line(aes(x=t, y=median, 
                 col=`Prior for sigma`), lwd=1.3) +
@@ -332,6 +305,7 @@ dev.off()
 
 ############## 
 # Survival varying extra knots across trial only, trial + BH, trial + BH + seer
+
 s4 <- ggplot(surv_plots %>% filter(df == 10 & prior_rate==1)) +
   geom_line(aes(x=t, y=median, 
                 col=`Extra knots`), lwd=1.3) +
@@ -362,8 +336,6 @@ tiff(file = "figure_survival_cetux_single_arm_sensitivity_knots.tiff",
 print(s4)
 dev.off()
 
-
-############################################
 # Hazard Plots
 
 # Varying number of degrees of freedom
