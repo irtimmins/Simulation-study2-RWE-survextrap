@@ -1,3 +1,6 @@
+#############################################################
+# Load packages
+#############################################################
 
 library(tidyr)
 library(dplyr)
@@ -20,27 +23,18 @@ library(survminer)
 library(purrr)
 
 #############################################################
-# specify jobname and path where results are to be stored.
+# specify path where results are to be stored.
 #############################################################
 
-setwd("/home/klvq491/survival_extrapolation/simsurvextrap")
-
-jobname <- "mix_weib_full1"
-user <- Sys.info()["user"]
-scratch_directory <- paste0("/scratch/", user, "/")
-
-check_status <- paste0("sacct -S ", as.character(Sys.Date()-20),
-                       " -u ", user ," --format=JobID,Jobname,partition,state,elapsed,ncpus -X")
-
-store_res <- paste0(scratch_directory, "simsurvextrap_slurm_", jobname, "/")
+store_res <- "directory/to/store/simulations"
 
 #############################################################
 # call scripts to create functions.
 #############################################################
 
-source("R/simulate_dgm_mixture_weibull.R")
-source("R/functions_aim2.R")
-source("R/estimands_aim2.R")
+source("Functions/simulate_dgm_mixture_weibull.R")
+source("Functions/simulation_functions.R")
+source("Functions/estimands.R")
 
 if(!dir.exists(store_res)){
   dir.create(store_res)
@@ -74,22 +68,13 @@ backhaz_models <- tibble(lambda_gpm = 0.000028,
   mutate(backhaz_model_id = paste0("backhaz_mod", row_number())) 
 
 # Age distribution
-
 # For cetuximab Bonner trial.
-# Derive mean age in each arm.
-# (doi:10.1186/1471-2288-14-135)
-(83+2*58+35)/4
-(81+2*56+34)/4
-# sd of age in each arm
-(83-35)/(2*qnorm((213-0.375)/(213+0.5)))
-(81-34)/(2*qnorm((211-0.375)/(211+0.5)))
 
-# Can approximate with mean 58, sd = 9.
-
-age_dist <- tibble(age_mean = 58,
+age_dist <- tibble(age_mean = 60,
                    age_sd = 9) 
 
 # Frailty effect sizes
+# Simulate without frailty effects.
 frailty_models <- tibble(alpha_frailty = c(0)) %>%
   mutate(frailty_model_id = paste0("frailty_mod", row_number()))
 
@@ -99,7 +84,8 @@ single_arm_trt_effect_models <- tibble(arms = "control",
                             beta = NA,  
                             design_id = "single_arm",
                             trt_effect_model_id = NA)
-
+# Define coefficients for the treatment effect functions
+# (see Supplementary Table 2)
 beta1 <- log(0.7)
 beta2 <- c(log(0.5)/(1-tanh(-1.2)), 0.8, -1.2)
 beta3 <- c(0, -2.8, 0.8, 0.4, 0.35)
@@ -166,7 +152,6 @@ external_data_models_labels <-
   mutate(haz_bias = if_else(haz_bias == "0", "`Unbiased`", haz_bias)) %>%
   select(-haz_bias_temp)  %>%
   rename(external_data_label = haz_bias) %>%
-  # arrange(abs(loghaz_bias)) %>%
   select(external_bias_model_id, external_data_label) %>%
   add_row(external_bias_model_id = "none", external_data_label = "`No`~`external`~`data`",
           .before = 1)# %>%
@@ -237,9 +222,6 @@ for(i in 1:nrow(dgm_backhaz_models)){
     select(lambda_gpm, gamma_gpm) %>%
     saveRDS(paste0(dgm_backhaz_models$backhaz_model_id[i], "/backhaz.rds"))
 }
-
-#test_backhaz <- readRDS("backhaz_mod1/backhaz.rds")
-#test_backhaz
 
 ###########################################
 # Create pars for slurm script.
@@ -357,12 +339,6 @@ sjob_dgm_trial_two_arm <- slurm_apply(sim_dgm_trt_mix,
 
 saveRDS(sjob_dgm_trial_two_arm, "sjob_dgm_trial_two_arm.rds")
 
-# Use the external data version of sim_dgm_trt_mix.
-test1 <- readRDS("_rslurm_dgm_ext/results_0.RDS")
-test2 <- readRDS("dgm_external1/trial_data5.rds")
-test2
-#test1
-
 sjob_dgm_external <- slurm_apply(sim_dgm_trt_mix_external, 
                                       pars_external, 
                                       jobname = "dgm_ext",
@@ -379,33 +355,20 @@ sjob_dgm_external <- slurm_apply(sim_dgm_trt_mix_external,
 
 saveRDS(sjob_dgm_external, "sjob_dgm_external.rds")
 
-check_status <- paste0("sacct -S ", as.character(Sys.Date()-20),
-                       " -u ", user ," --format=JobID,Jobname,partition,state,elapsed,ncpus -X")
-
-system(check_status)
-test <- readRDS("_rslurm_dgm_ext/results_0.RDS")
-test[[1]]
-
 
 # Check trial/external data has been generated.
 pars_single_arm_trial_rerun <- pars_single_arm_trial %>%
   mutate(output_file = substr(save_file, start = 4, stop = nchar(save_file))) %>%
   mutate(job_run = if_else(file.exists(output_file), TRUE, FALSE))
 summary(as.factor(pars_single_arm_trial_rerun$job_run))
-#head(pars_single_arm_trial_rerun$output_file)
 
 pars_two_arm_trial_rerun <- pars_two_arm_trial %>%
   mutate(output_file = substr(save_file, start = 4, stop = nchar(save_file))) %>%
   mutate(job_run = if_else(file.exists(output_file), TRUE, FALSE))
-#View(pars_two_arm_trial_rerun)
-summary(as.factor(pars_two_arm_trial_rerun$job_run))
-#head(pars_two_arm_trial_rerun$output_file)
 
 pars_external_rerun <- pars_external %>%
   mutate(output_file = substr(save_file, start = 4, stop = nchar(save_file))) %>%
   mutate(job_run = if_else(file.exists(output_file), TRUE, FALSE))
-
-summary(as.factor(pars_external_rerun$job_run))
 
 # Rerun any failed jobs.
 sjob_dgm_trial_two_arm_rerun <- slurm_apply(sim_dgm_trt_mix, 
@@ -462,7 +425,6 @@ pars_true_big <- dgm_true %>%
   select(-ends_with("_id")) 
 saveRDS(pars_true_big, "pars_true_big.rds")
 pars_true_big <- readRDS("pars_true_big.rds")
-#View(pars_true_big)
 
 sjob_dgm_big <- slurm_apply(sim_dgm_trt_mix, 
                                 pars_true_big, 
@@ -477,12 +439,10 @@ sjob_dgm_big <- slurm_apply(sim_dgm_trt_mix,
                                                       "mem-per-cpu"= '16G'))
 
 saveRDS(sjob_dgm_big , "sjob_dgm_big.rds")
-system(check_status)
 
 pars_true_big_rerun <- pars_true_big %>%
   mutate(output_file = substr(save_file, start = 4, stop = nchar(save_file))) %>%
   mutate(job_run = if_else(file.exists(output_file), TRUE, FALSE))
-summary(as.factor(pars_true_big_rerun$job_run))
 
 sjob_dgm_big_rerun <- slurm_apply(sim_dgm_trt_mix, 
                             pars_true_big_rerun %>%
@@ -497,8 +457,6 @@ sjob_dgm_big_rerun <- slurm_apply(sim_dgm_trt_mix,
                             slurm_options = list(time='36:00:00',
                                                  partition='core',
                                                  "mem-per-cpu"= '16G'))
-
-
 
 
 ############################################
@@ -584,7 +542,6 @@ external_data_settings <- expand_grid(
   backhaz = c(F,T),
   include_external_data = c(F,T),
   add_knots = names(extra_knots_settings)) %>%
- # filter(add_knots == "none" | include_external_data == T) %>%
   filter(add_knots != "none" | include_external_data == F) %>%
   filter(add_knots == "none" | backhaz == T) %>%
   filter(!(backhaz == F & include_external_data == T))
@@ -752,11 +709,6 @@ pars_two_arm_fit <- readRDS("pars_two_arm_fit.rds")
 # create directories to store results
 ############################################
 
-# if necessary to delete.
-# for(i in 1:nrow(scenarios)){
-# system(paste0("rm -r ", scenarios$scenario_fit_id[i]))   
-# }
-
 for(i in 1:nrow(scenarios)){
   if(!dir.exists(scenarios$scenario_fit_id[i])){
     dir.create(scenarios$scenario_fit_id[i])
@@ -785,7 +737,6 @@ fit_objects_attach <- c("extra_knots_settings",
                         "rmst_samples_GL",
                         "set_knots")
 
-#nrow(pars_single_arm_fit)
 sjob_single_arm_fit <- slurm_apply(fit_est_slurm , 
                             pars_single_arm_fit, 
                             jobname = "fit_single",
@@ -799,7 +750,6 @@ sjob_single_arm_fit <- slurm_apply(fit_est_slurm ,
                                                  "mem-per-cpu"= '16G'))
 
 saveRDS(sjob_single_arm_fit , "sjob_single_arm_fit.rds")
-system(check_status)
 
 sjob_two_arm_fit <- slurm_apply(fit_est_slurm, 
                                    pars_two_arm_fit,
@@ -815,15 +765,10 @@ sjob_two_arm_fit <- slurm_apply(fit_est_slurm,
                                                         "mem-per-cpu"= '16G'))
 
 saveRDS(sjob_two_arm_fit , "sjob_two_arm_fit.rds")
-system(check_status)
 
 ####################################################
 ## Identify and re-run failed jobs.
 #####################################################
-
-# add dependency...
-# head(pars_single_arm_fit)
-# View(pars_single_arm_fit)
 
 pars_single_arm_fit_rerun <- pars_single_arm_fit %>%
   mutate(output_file = substr(save_file, start = 4, stop = nchar(save_file))) %>%
@@ -966,13 +911,6 @@ sjob_dgm_haz_true <- slurm_apply(dgm_haz_true,
                                                      partition='core',
                                                      "mem-per-cpu"= '128G'))
 
-#test <- readRDS("_rslurm_dgm_haz_true/results_1.RDS")
-#test
-#system("tail _rslurm_dgm_haz_true/slurm_0.out")
-#test2 <- readRDS("dgm_true_mod3/hazard_true.rds")
-#summary(as.factor(test$estimand))
-#View(test)
-
 ################################################
 # Get true survival/RMST/iRMST
 ################################################
@@ -982,8 +920,6 @@ sjob_dgm_haz_true <- slurm_apply(dgm_haz_true,
 dgm_true <- readRDS("dgm_true.rds")
 pars_true_big <- readRDS("pars_true_big.rds")
 package_attach <- readRDS("package_attach.rds")
-
-names(dgm_true)
 
 pars_dgm_combine <- dgm_true %>%
   select(nsim, true_model_id) %>%
@@ -1018,8 +954,6 @@ sjob_dgm_surv_true <- slurm_apply(dgm_surv_true,
                                                      partition='core',
                                                      "mem-per-cpu"= '16G'))
 
-#temp <- readRDS(paste0("dgm_true_mod", i, "/survival_true.rds"))
-
 pars_dgm_rmst_true <- dgm_true %>%
   select(true_model_id, design_id) %>%
   mutate(big_data_file = paste0("../dgm_", true_model_id, "/big_data.rds")) %>%
@@ -1038,15 +972,12 @@ sjob_dgm_rmst_true <- slurm_apply(dgm_rmst_true,
                                                        partition='core',
                                                        "mem-per-cpu"= '16G'))
 
-#test <- readRDS("_rslurm_dgm_rmst_true/results_0.RDS")
-#test <- readRDS("dgm_true_mod3/rmst_true.rds")
 
 pars_dgm_irmst_true <- dgm_true %>%
   filter(design_id == "two_arm") %>%
   select(true_model_id, design_id) %>%
   mutate(big_data_file = paste0("../dgm_", true_model_id, "/big_data.rds")) %>%
   mutate(save_file = paste0("../dgm_", true_model_id, "/irmst_true.rds"))
-
 
 sjob_dgm_irmst_true <- slurm_apply(dgm_irmst_true, 
                                   pars_dgm_irmst_true, 
@@ -1061,10 +992,6 @@ sjob_dgm_irmst_true <- slurm_apply(dgm_irmst_true,
                                                        partition='core',
                                                        "mem-per-cpu"= '16G'))
 
-
-system(check_status)
-#test <- readRDS("dgm_true_mod3/irmst_true.rds")
-#test
 
 ################################################
 # Combine true for hazard, survival and rmst.
@@ -1100,7 +1027,6 @@ for(i in 1:nrow(dgm_true)){
   saveRDS(all_true, paste0("dgm_true_mod", i, "/all_true.rds"))   
   
 }
-
 
 ####################################################
 # combine simulated and true results for estimands. 
@@ -1148,15 +1074,6 @@ pars_simsum_rmst <- scenarios %>%
   mutate(results_file = paste0("../", scenario_fit_id,"/all_res.rds")) %>%
   mutate(save_file = paste0("../", scenario_fit_id,"/rmst_and_irmst_performance.rds"))
 
-# simsum_rmst(design_id = pars_simsum_rmst$design_id[1], 
-#             scenario_fit_id = pars_simsum_rmst$scenario_fit_id[1], 
-#             results_file = "scen_fit1/all_res.rds", 
-#             save_file = "scen_fit1/rmst_and_irmst_performance_test.rds" )
-
-#test <- readRDS("_rslurm_simsum_rmst/results_5.RDS")
-#test_rmst <- readRDS("scen_fit50/rmst_and_irmst_performance.rds")
-#test_rmst
-
 sjob_simsum_rmst <- slurm_apply(simsum_rmst, 
                                 pars_simsum_rmst,
                                 jobname = "simsum_rmst",
@@ -1169,12 +1086,9 @@ sjob_simsum_rmst <- slurm_apply(simsum_rmst,
                                                      partition='core',
                                                      "mem-per-cpu"= '16G'))
 
-system(check_status)
 
-# scenarios <- scenarios %>%
-#   filter(design_id == "single_arm")
+
 for(scen_fit in scenarios$scenario_fit_id){
-  #i <- 1
   temp <- readRDS(paste0(scen_fit, "/rmst_and_irmst_performance.rds"))
  if(scen_fit == scenarios$scenario_fit_id[1]){
    comb <- temp
@@ -1189,14 +1103,10 @@ performance_all <- as_tibble(performance_all) %>%
   mutate(scenario_fit_id = as.character(scenario_fit_id))
 saveRDS(performance_all, "rmst_and_irmst_performance.rds")
 
-#summary(as.factor(performance_all$estimand))
-#summary(as.factor(performance_all$scenario_fit_id))
-#names(performance_all)
 performance_all %>%
   select(estimand_id) %>%
   distinct() %>%
   summarise(count = n())
-
 
 ########################################
 # Combine mspline knots locations.
@@ -1234,25 +1144,4 @@ if(!dir.exists("plots")){
   dir.create("plots/two_arm")
   dir.create("plots/single_and_two_arm")
 }  
-
-########################################
-# Transfer to permanent project drive.
-########################################
-
-dgm_true <- readRDS("dgm_true.rds")
-project_directory <- paste0("/projects/aa/", user, "/")
-store_project_res <- paste0(project_directory, "simsurvextrap_slurm_", jobname, "/")
-
-if(!dir.exists("log")){
-  dir.create("log")
-}  
-
-system(paste0("cp -r . ",store_project_res))
-# for(i in 1:nrow(dgm_true)){
-# system(paste0("cp -r dgm_true_mod",i,"/all_true.rds ", store_project_res, "dgm_true_mod",i,"/"))
-# }
-# for(i in 1:nrow(scenarios)){
-# system(paste0("cp -r scen_fit",i,"/all_res.rds ", store_project_res, "scen_fit",i,"/"))
-# }
-system(paste0("cp -r /home/klvq491/survival_extrapolation/simsurvextrap/aim2-slurm/Aim2* ",store_project_res, "log" ))
 

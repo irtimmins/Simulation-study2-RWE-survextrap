@@ -1,5 +1,10 @@
+
 # If running interactively, requires 64Gb of memory
 # (or remove models once their summary stats have been calculated)
+
+#############################################################
+# Load packages
+#############################################################
 
 library(survextrap)
 library(ggplot2)
@@ -19,21 +24,37 @@ library(wrapr)
 library(patchwork)
 library(readr)
 
-# Load rmst_fast and irmst_fast.
+#############################################################
+# specify path where results are to be stored.
+#############################################################
+
+store_res <- "directory/to/store/case_study"
+
+#############################################################
+# call scripts to create functions.
+#############################################################
 
 source("Functions/case_study_functions.R")
 
-########################################################################################
-# Single arm models (Control arm only)
-########################################################################################
-
 # Load datasets from Bonner trial. 
+# (If not available from survextrap R package)
+
 # Control and Cetuximab arms.
 control <- readRDS("Data/Bonner_control.RDS")
 cetuximab <- readRDS("Data/Bonner_active.RDS")
 
 # Both arms data.
 cetux <- readRDS("Data/Bonner_all.RDS")
+
+if(!dir.exists(store_res)){
+  dir.create(store_res)
+}
+
+setwd(store_res)
+
+########################################################################################
+# Single arm models (Control arm only)
+########################################################################################
 
 # Derive Kaplan-Meier curves of Bonner trial.
 # Both arms

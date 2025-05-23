@@ -1,8 +1,42 @@
-################################################################################
-## Two-arm modelling
-################################################################################
+# If running interactively, requires 64Gb of memory
+# (or remove models once their summary stats have been calculated)
+
+#############################################################
+# Load packages
+#############################################################
+
+library(survextrap)
+library(ggplot2)
+library(dplyr)
+library(viridis) # for colour palettes
+library(memoise)
+library(stringr)
+library(gridExtra)
+library(pracma)
+library(tidyr)
+library(flextable)
+library(abind)
+library(cowplot)
+library(magrittr)
+library(purrr)
+library(wrapr)
+library(patchwork)
+library(readr)
+
+#############################################################
+# specify path where results are to be stored.
+#############################################################
+
+store_res <- "directory/to/store/case_study"
+
+#############################################################
+# call scripts to create functions.
+#############################################################
+
+source("Functions/case_study_functions.R")
 
 # Load datasets from Bonner trial. 
+# (If not available from survextrap R package)
 
 # Control and Cetuximab arms.
 control <- readRDS("Data/Bonner_control.RDS")
@@ -10,6 +44,16 @@ cetuximab <- readRDS("Data/Bonner_active.RDS")
 
 # Both arms data.
 cetux <- readRDS("Data/Bonner_all.RDS")
+
+if(!dir.exists(store_res)){
+  dir.create(store_res)
+}
+
+setwd(store_res)
+
+################################################################################
+## Two-arm modelling
+################################################################################
 
 # Derive Kaplan-Meier curves of Bonner trial.
 # Both arms
@@ -30,7 +74,6 @@ prior_haz_const(mspline_base, prior_hscale = prior_hscale)
 
 # Whether to run two arm models or load in predictions from disk
 run_two_arm_models <- FALSE
-
 
 if(run_two_arm_models){
   two_arm_models <- list()
