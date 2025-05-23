@@ -1,3 +1,8 @@
+#########################################################
+# Figure 5a, Simulation study,
+# plot survival functions.
+#########################################################
+
 library(tidyr)
 library(dplyr)
 library(ggplot2)
@@ -16,7 +21,7 @@ library(forcats)
 library(ggh4x)
 
 # Jobname where results are stored.
-stores_res <- "directory_where_simulations_are_stored"
+stores_res <- "directory/to/store/simulations"
 setwd(store_res)
 
 # Read in scenarios data
@@ -207,4 +212,4 @@ surv_plot <-  scen_df %>%
   ))+
   guides(linewidth = "none", alpha = "none", colour = "none") 
 
-saveRDS(surv_plot, "plots/Figure4a.rds")
+saveRDS(surv_plot, "plots/Figure_5a.rds")

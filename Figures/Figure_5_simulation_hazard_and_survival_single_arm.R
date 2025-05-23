@@ -1,3 +1,9 @@
+#########################################################
+# Figure 5, Simulation study,
+# survival and hazard functions.
+# Combine 5a and 5b together.
+#########################################################
+
 library(tidyr)
 library(dplyr)
 library(ggplot2)
@@ -14,12 +20,12 @@ library(rstpm2)
 library(data.table)
 
 # Jobname where results are stored.
-stores_res <- "directory_where_simulations_are_stored"
+stores_res <- "directory/to/store/simulations"
 setwd(store_res)
 
-# Run Figure_4a and Figure_4b scripts first and import.
-surv_plot <- readRDS("plots/Figure4a.rds")
-haz_plot <- readRDS("plots/Figure4b.rds")
+# Run Figure_5a and Figure_5b scripts first and import.
+surv_plot <- readRDS("plots/Figure_5a.rds")
+haz_plot <- readRDS("plots/Figure_5b.rds")
 
 # Combine survival and hazard plots using plot_grid.
 plot_all <- plot_grid(surv_plot +
@@ -34,7 +40,7 @@ plot_all <- plot_grid(surv_plot +
                       rel_heights=c(0.5,0.5),
                       ncol = 1)
 
-tiff(file = "plots/figure4.tiff",   
+tiff(file = "plots/Figure_5.tiff",   
      width = 5.0, 
      height = 6.2,
      units = 'in',  

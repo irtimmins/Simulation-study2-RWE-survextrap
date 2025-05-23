@@ -1,3 +1,8 @@
+#########################################################
+# Figure 5b, Simulation study,
+# plot hazard functions.
+#########################################################
+
 library(tidyr)
 library(dplyr)
 library(ggplot2)
@@ -16,7 +21,7 @@ library(forcats)
 library(ggh4x)
 
 # Jobname where results are stored.
-stores_res <- "directory_where_simulations_are_stored"
+stores_res <- "directory/to/store/simulations"
 setwd(store_res)
 
 # Read in scenarios data
@@ -205,4 +210,4 @@ haz_plot <- scen_df %>%
   ))+
   guides(linewidth = "none", alpha = "none", colour = "none") 
 
-saveRDS(haz_plot, "plots/Figure4b.rds")
+saveRDS(haz_plot, "plots/Figure_5b.rds")

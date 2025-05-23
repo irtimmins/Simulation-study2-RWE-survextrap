@@ -131,12 +131,12 @@ plot_all_single_arm <- plot_grid(
   rel_heights = c(1,-0.02, 1),
   ncol = 1)
 
-pdf(file = "Plots/Figure1.pdf",   
+pdf(file = "Plots/Figure_1.pdf",   
      width = 5.8, 
      height = 3.8)  
 print(plot_all_single_arm)
 dev.off()
 
-ggsave("Plots/Figure1.svg",
+ggsave("Plots/Figure_1.svg",
        width = 5.8, 
        height = 3.8)  

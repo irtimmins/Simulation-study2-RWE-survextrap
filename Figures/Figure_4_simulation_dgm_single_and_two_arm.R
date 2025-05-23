@@ -1,3 +1,8 @@
+#########################################################
+# Figure 4, Simulation study,
+# data generating mechanism figure.
+#########################################################
+
 library(tidyr)
 library(dplyr)
 library(ggplot2)
@@ -15,7 +20,12 @@ library(data.table)
 library(survminer)
 library(RColorBrewer)
 
+# Load data generating functions.
 source("Functions/simulate_dgm_mixture_weibull.R")
+
+# Set directory to where simulation results are stored.
+store_res <- "directory/to/store/simulations"
+setwd(store_res)
 
 #####################################################
 # Single arm DGMs. 
@@ -201,6 +211,7 @@ for(i in 1:nrow(scenarios2)){
 }
 
 ##############################################
+
 margins1 <- unit(c(0.1,0.1,0,0), "cm")
 margins2 <- unit(c(0,0.1,0,0), "cm")
 margins3 <- unit(c(0,0.1,0,0), "cm")
@@ -312,7 +323,7 @@ plot_all_dgm <- plot_grid(
   rel_heights = c(1.08,1.08,1,1),
   ncol = 1)
 
-tiff(file = "Plots/figure3.tiff",   
+tiff(file = "plots/Figure_4.tiff",   
      width = 6.2, 
      height = 7.1,
      units = 'in',  
