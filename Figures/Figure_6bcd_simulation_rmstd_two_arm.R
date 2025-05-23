@@ -1,3 +1,8 @@
+#########################################################
+# Figure 6bcd, Simulation study, irmst plot.
+# Generate plots for each irmst time point.
+#########################################################
+
 library(tidyr)
 library(dplyr)
 library(ggplot2)
@@ -21,13 +26,10 @@ library(grid)
 library(gridExtra) 
 
 # Jobname where results are stored.
-stores_res <- "directory_where_simulations_are_stored"
+stores_res <- "directory/to/store/simulations"
 setwd(store_res)
 
-######################################################
-# All scenarios figure.
-######################################################
-
+# Load in data on scenarios and performance metrics.
 scenarios <- readRDS("scenarios.rds")
 performance_res <- readRDS("rmst_and_irmst_performance.rds")
 
@@ -45,10 +47,9 @@ external_data_models_labels <-
   mutate(haz_bias = if_else(haz_bias == "0", "Unbiased external data", haz_bias)) %>%
   select(-haz_bias_temp)  %>%
   rename(external_data_label = haz_bias) %>%
-  # arrange(abs(loghaz_bias)) %>%
   select(external_bias_model_id, external_data_label) %>%
   add_row(external_bias_model_id = "none", external_data_label = "No external data",
-          .before = 1)# %>%
+          .before = 1)
 
 extra_knots_settings <- readRDS("extra_knots_settings.rds")
 extra_knots_models <- readRDS("extra_knots_models.rds")
@@ -86,27 +87,16 @@ new_model <-  scenarios %>%
          backhaz == T,
          waning_model_id == "waning_mod1") %>%
   mutate(new_model_id = paste0(external_bias_model_id, "_", add_knots)) %>%
-  mutate(new_model_id_labels = 0) #%>%
-  #slice(c(2,3,5,4,1,6,7))
+  mutate(new_model_id_labels = 0)
 
-  summary(as.factor(new_model$new_model_id))
-#View(new_model)
-  
-  
 for(i in 1:nrow(new_model)){
-  # i <- 2
+
   if(new_model$external_bias_model_id[i] == "none"){
-    #new_model$add_knots
     label1 <- external_data_models_labels$external_data_label[
       external_data_models_labels$external_bias_model_id == new_model$external_bias_model_id[i]]
     label2 <-  extra_knots_models$extra_knots_labels[
       extra_knots_models$extra_knots_id == new_model$add_knots[i]]
-    
-    # label2 <- "*`,`"
-    # label3 <- "~`with`~"
-    # label4 <-  extra_knots_models$extra_knots_labels[
-    #   extra_knots_models$extra_knots_id == new_model$add_knots[i]]
-    
+
     new_model$new_model_id_labels[i] <- paste0(label1, label2)
     
   } else{ 
@@ -116,10 +106,10 @@ for(i in 1:nrow(new_model)){
     
   }
 }
-  new_model_levels <- unique(new_model$new_model_id)[c(2,3,5,4,1,6,7)]
-  new_model_labels <- unique(new_model$new_model_id_labels)[c(2,3,5,4,1,6,7)]
-  new_model_levels
-  new_model_labels    
+  
+new_model_levels <- unique(new_model$new_model_id)[c(2,3,5,4,1,6,7)]
+new_model_labels <- unique(new_model$new_model_id_labels)[c(2,3,5,4,1,6,7)]
+
   
 ####################################################
 # Difference in RMST across arms.
@@ -130,6 +120,8 @@ estimand_labels <- readRDS("estimand_labels.rds")
 irmst_estimand_vec <- estimand_labels %>%
   filter(estimand == "irmst") %>%
   pull(estimand_id)
+
+# Generate plot for each rmst time point.
 
 for(irmst_estimand in irmst_estimand_vec){
   
@@ -145,7 +137,6 @@ for(irmst_estimand in irmst_estimand_vec){
                                       labels = new_model_labels)) %>%
           mutate("GPM rates" = if_else(backhaz, "Included", "Not included")) %>%
           mutate("All models" = paste0(external_bias_model_id, "_", add_knots)) %>%
-          #arrange(`Extra knots`) %>%
           arrange(Scenarios) %>%
           arrange(backhaz) %>%
           arrange(include_external_data) %>%

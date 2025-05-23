@@ -1,3 +1,7 @@
+#########################################################
+# Figure 6a, Simulation study, rmst plot.
+# Generate plots for each rmst time point.
+#########################################################
 
 library(tidyr)
 library(dplyr)
@@ -21,11 +25,8 @@ library(ggpubr)
 library(grid)
 library(gridExtra) 
 
-jobname <- "mix_weib_full1"
-user <- Sys.info()["user"]
-project_directory <- paste0("/projects/aa/", user, "/")
-store_res <- paste0(project_directory, "simsurvextrap_slurm_", jobname, "/")
-
+# Jobname where results are stored.
+stores_res <- "directory/to/store/simulations"
 setwd(store_res)
 
 scenarios <- readRDS("scenarios.rds")
@@ -142,11 +143,11 @@ rmst_estimand_vec <- estimand_labels %>%
   filter(estimand == "rmst", trt == 0) %>%
   pull(estimand_id)
 
+# Generate plot for each rmst time point.
+
 for(rmst_estimand in rmst_estimand_vec){
   
-# rmst_estimand <- "rmst1_trt0"
 
-    #extra_knots_models
     scen_df <-
       new_model  %>%
       left_join(performance_res, by = "scenario_fit_id")  %>%
@@ -282,5 +283,3 @@ for(rmst_estimand in rmst_estimand_vec){
   
 }
   
-plot1 <- readRDS(paste0("plots/single_arm/forest_",rmst_estimand,"_single_arm_plot.rds"))
-

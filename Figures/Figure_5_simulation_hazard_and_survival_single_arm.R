@@ -49,4 +49,3 @@ tiff(file = "plots/Figure_5.tiff",
 print(plot_all)
 dev.off()
 
-

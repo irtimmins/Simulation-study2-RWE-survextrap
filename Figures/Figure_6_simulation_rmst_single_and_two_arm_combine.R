@@ -1,3 +1,7 @@
+#########################################################
+# Figure 6, Simulation study, rmst plot.
+# Combine figures 6a, 6b, 6c and 6d together.
+#########################################################
 
 library(tidyr)
 library(dplyr)
@@ -22,7 +26,7 @@ library(grid)
 library(gridExtra) 
 
 # Jobname where results are stored.
-stores_res <- "directory_where_simulations_are_stored"
+stores_res <- "directory/to/store/simulations"
 setwd(store_res)
 
 # Read in scenarios data.
@@ -36,6 +40,8 @@ estimand_labels <- readRDS("estimand_labels.rds")
 irmst_estimand_vec <- estimand_labels %>%
   filter(estimand == "irmst") %>%
   pull(estimand_id)
+
+# Produce plot for each rmst time point.
 
 for(irmst_estimand in irmst_estimand_vec){
 
@@ -128,9 +134,28 @@ for(irmst_estimand in irmst_estimand_vec){
   print(plot_all)
   dev.off()
 
-
 }
 
-# Extract for t = 40 years.
-# ...
+# Extract at time t = 40 years.
+
+irmst_estimand_plot <- estimand_labels %>%
+  filter(t == 40) %>%
+  filter(estimand == "irmst") %>%
+  pull(estimand_id)
+
+estimand_plot <- substr(irmst_estimand_plot, 6, nchar(irmst_estimand_plot))
+
+plot_file <- paste0("plots/single_and_two_arm/forest_rmst_and_irmst", 
+                    estimand_plot, "_all.rds")
+
+figure_6 <- readRDS(plot_file)
+
+tiff(file = "plots/Figure_6.tiff",   
+     width = 6.6, 
+     height = 6.8,
+     units = 'in',  
+     res = 300, 
+     compression = "lzw")
+print(figure_6)
+dev.off()
 

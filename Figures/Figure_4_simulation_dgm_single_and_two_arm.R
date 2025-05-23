@@ -313,7 +313,6 @@ for(i in 1:3){
   
 }
 
-
 plot_all_dgm <- plot_grid(
   single_arm,
   all_fig1,
