@@ -1,4 +1,6 @@
 ###########################################
+
+
 library(tidyr)
 library(dplyr)
 library(ggplot2)
@@ -21,11 +23,8 @@ library(ggpubr)
 library(grid)
 library(gridExtra) 
 
-
-jobname <- "mix_weib_full1"
-user <- Sys.info()["user"]
-project_directory <- paste0("/projects/aa/", user, "/")
-store_res <- paste0(project_directory, "simsurvextrap_slurm_", jobname, "/")
+# Set directory to where simulation results are stored.
+store_res <- "directory/to/store/simulations"
 setwd(store_res)
 
 scenarios <- readRDS("scenarios.rds")
@@ -45,10 +44,9 @@ external_data_models_labels <-
   mutate(haz_bias = if_else(haz_bias == "0", "Unbiased external data", haz_bias)) %>%
   select(-haz_bias_temp)  %>%
   rename(external_data_label = haz_bias) %>%
-  # arrange(abs(loghaz_bias)) %>%
   select(external_bias_model_id, external_data_label) %>%
   add_row(external_bias_model_id = "none", external_data_label = "No external data",
-          .before = 1)# %>%
+          .before = 1)
 
 extra_knots_settings <- readRDS("extra_knots_settings.rds")
 extra_knots_models <- readRDS("extra_knots_models.rds")
@@ -90,18 +88,13 @@ new_model <-  scenarios %>%
   mutate(new_model_id_labels = 0)
 
 for(i in 1:nrow(new_model)){
-  # i <- 2
+
   if(new_model$external_bias_model_id[i] == "none"){
-    #new_model$add_knots
+
     label1 <- external_data_models_labels$external_data_label[
       external_data_models_labels$external_bias_model_id == new_model$external_bias_model_id[i]]
     label2 <-  extra_knots_models$extra_knots_labels[
       extra_knots_models$extra_knots_id == new_model$add_knots[i]]
-    
-    # label2 <- "*`,`"
-    # label3 <- "~`with`~"
-    # label4 <-  extra_knots_models$extra_knots_labels[
-    #   extra_knots_models$extra_knots_id == new_model$add_knots[i]]
     
     new_model$new_model_id_labels[i] <- paste0(label1, label2)
     
@@ -112,14 +105,12 @@ for(i in 1:nrow(new_model)){
     
   }
 }
+
 new_model_levels <- unique(new_model$new_model_id)[c(2,3,5,4,1,6,7)]
 new_model_labels <- unique(new_model$new_model_id_labels)[c(2,3,5,4,1,6,7)]
-new_model_levels
-new_model_labels    
 
 two_arm_waning_settings <- readRDS("two_arm_waning_settings.rds")
 two_arm_waning_settings$waning_model_labels <- 0
-#head(two_arm_waning_settings)
 
 for(i in 1:nrow(two_arm_waning_settings)){
   if(is.na(two_arm_waning_settings$wane_period_start[i])){
@@ -146,8 +137,6 @@ irmst_estimand_vec <- estimand_labels %>%
 
 for(irmst_estimand in irmst_estimand_vec){
   
-  #irmst_estimand <- "irmst2"
-  
   for(model in c("PH", "Non-PH")){
  
     for(j in 1:3){
@@ -169,13 +158,12 @@ for(irmst_estimand in irmst_estimand_vec){
                                           labels = waning_model_labels)) %>%
       mutate("GPM rates" = if_else(backhaz, "Included", "Not included")) %>%
       mutate("All models" = paste0(external_bias_model_id, "_", add_knots)) %>%
-      #arrange(`Extra knots`) %>%
       arrange(Scenarios) %>%
       arrange(backhaz) %>%
       arrange(include_external_data) %>%
       group_by(stat) %>%
       mutate(y_height = -row_number()) %>%
-      ungroup() #%>%
+      ungroup()
 
     scen_all_df <- 
       new_model %>%
@@ -316,9 +304,7 @@ for(irmst_estimand in irmst_estimand_vec){
                         rel_widths=c(1, 0.7),
                         axis = "l"
   )
-  
-  # plot_all
-  
+
   saveRDS(plot_all, paste0("plots/two_arm/forest_", irmst_estimand, "_", model_str, ".rds"))
   
   tiff(file = paste0("plots/two_arm/forest_", irmst_estimand, "_", model_str, ".tiff"),   
@@ -330,9 +316,7 @@ for(irmst_estimand in irmst_estimand_vec){
   print(plot_all)
   dev.off()
   
-
   }
-  
   
   plot1_ph <- readRDS(paste0("plots/two_arm/forest_", irmst_estimand,"_model", 1,"_", "ph", ".rds"))
   plot1_ph_no_legend <- plot1_ph +
@@ -407,8 +391,7 @@ for(irmst_estimand in irmst_estimand_vec){
 
   
   plot_both_with_legend  
-  #plot_both_with_legend  
-  
+
   saveRDS(plot_both_with_legend, paste0("plots/two_arm/forest_", irmst_estimand, "_waning.rds"))
   
   tiff(file = paste0("plots/two_arm/forest_", irmst_estimand, "_waning.tiff"),   
