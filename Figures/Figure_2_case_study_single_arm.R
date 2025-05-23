@@ -1,5 +1,6 @@
 #########################################################
-# Single arm, manuscript plot with both survival and hazard.
+# Figure 2, Single arm, 
+# manuscript plot with both survival and hazard.
 #########################################################
 
 library(ggplot2)
@@ -17,6 +18,13 @@ library(purrr)
 library(wrapr)
 library(patchwork)
 library(readr)
+
+#############################################################
+# specify path to case study data
+#############################################################
+
+store_res <- "directory/to/store/case_study"
+setwd(store_res)
 
 # Load datasets.
 load("surv_plots.Rdata") # load survival stats

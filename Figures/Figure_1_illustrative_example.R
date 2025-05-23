@@ -18,19 +18,24 @@ library(wrapr)
 library(patchwork)
 library(readr)
 
+#############################################################
+# specify path to case study data
+#############################################################
+
+store_res <- "directory/to/store/case_study"
+setwd(store_res)
+
 # Load datasets.
 load("surv_plots.Rdata") # load survival stats
 load("haz_plots.Rdata") # load hazard stats
 
-summary(surv_plots)
-
+# Extract scenarios without external data to plot.
 
 surv_df <- surv_plots %>%
   filter(`External data` == "Trial only",
          df == 10,
          `Prior for sigma` == 1,
          `Extra knots` %in% c("None", "10,15,25"))
-summary(as.factor(surv_df$model_number))
 
 haz_df <- haz_plots %>%
   filter(`External data` == "Trial only",
@@ -38,54 +43,19 @@ haz_df <- haz_plots %>%
          `Prior for sigma` == 1,
          `Extra knots` %in% c("None", "10,15,25"))
 
-summary(as.factor(haz_df$model_number))
-
-model_without_ek <- models_control[[1]]
-model_without_ek$mspline$knots
-
-model_with_ek <- models_control[[12]]
-model_with_ek$mspline$knots
-
-###############################################
-###############################################
-
-
-
-#########################################################
-# Single arm, manuscript plot with both survival and hazard.
-#########################################################
-
-library(ggplot2)
-library(dplyr)
-library(viridis) # for colour palettes
-library(stringr)
-library(gridExtra)
-library(pracma)
-library(tidyr)
-library(flextable)
-library(abind)
-library(cowplot)
-library(magrittr)
-library(purrr)
-library(wrapr)
-library(patchwork)
-library(readr)
-
-# Load datasets.
-load("surv_plots.Rdata") # load survival stats
-load("haz_plots.Rdata") # load hazard stats
-
 # Run case_study_script.R to get models_control.
 knots1 <- models_control[[1]]$mspline$knots
 knots12 <- models_control[[12]]$mspline$knots
 
 colour_fill <- "deepskyblue3"
 colour_KM <- "gray20"
+
 margins1 <- unit(c(0.0,0.0,0.0,0), "cm")
 margins2 <- unit(c(0.0,0.4,0.0,0), "cm")
-# hjust_vec <- c(-0.8/.pt, -4.5/.pt, 1.5/.pt)
+
 hjust1 <- c(0/.pt)
 hjust12 <- c(0/.pt)
+
 title1  <- "(a) Model fitted to trial data, without extra knots"
 title12  <-  "(b) Model fitted to trial data, with extra knots"
 
@@ -161,14 +131,12 @@ plot_all_single_arm <- plot_grid(
   rel_heights = c(1,-0.02, 1),
   ncol = 1)
 
-plot_all_single_arm
-
-pdf(file = "Figure1_spline_illustration.pdf",   
+pdf(file = "Plots/Figure1.pdf",   
      width = 5.8, 
      height = 3.8)  
 print(plot_all_single_arm)
 dev.off()
 
-ggsave("Figure1_spline_illustration.svg",
+ggsave("Plots/Figure1.svg",
        width = 5.8, 
        height = 3.8)  

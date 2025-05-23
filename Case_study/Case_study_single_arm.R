@@ -1,4 +1,3 @@
-
 # If running interactively, requires 64Gb of memory
 # (or remove models once their summary stats have been calculated)
 
@@ -51,6 +50,13 @@ if(!dir.exists(store_res)){
 }
 
 setwd(store_res)
+
+# Create directory to store plots.
+
+if(!dir.exists("Plots")){
+  dir.create("Plots")
+}  
+
 
 ########################################################################################
 # Single arm models (Control arm only)
@@ -461,9 +467,4 @@ tiff(file = "figure_hazard_cetux_single_arm_sensitivity_knots.tiff",
      compression = "lzw")
 print(h4)
 dev.off()
-
-
-
-
-
 

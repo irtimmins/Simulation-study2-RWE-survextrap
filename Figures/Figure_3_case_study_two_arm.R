@@ -1,5 +1,6 @@
 #########################################################
-# Two arms, manuscript plot with both survival and HRs.
+# Figure 3, Two arms, 
+# manuscript plot with both survival and HRs.
 #########################################################
 
 library(ggplot2)
@@ -18,7 +19,12 @@ library(wrapr)
 library(patchwork)
 library(readr)
 
-# Load survival and hazard results.
+#############################################################
+# specify path to case study data
+#############################################################
+
+store_res <- "directory/to/store/case_study"
+setwd(store_res)
 
 # Load from single arms results.
 load("surv_plots.Rdata") # load survival stats
@@ -29,8 +35,6 @@ load("surv_plots_cetux.Rdata") # load survival stats
 load("haz_plots_two_arms.Rdata") # load hazard stats
 load("haz_plots_cetux.Rdata") # load hazard stats
 load("haz_ratio_plots.Rdata") # load hazard stats
-
-
 
 two_arm_models <- c("Proportional \nhazards", 
                     "Non-proportional \nhazards",
@@ -148,7 +152,7 @@ plot_all_two_arm <- plot_grid(
   rel_heights = c(1,-0.05,1,-0.05,1),
   ncol = 1)
 
-tiff(file = "Plots/figure2.tiff",   
+tiff(file = "Plots/Figure3.tiff",   
      width = 5.8, 
      height = 5.3,
      units = 'in',  
