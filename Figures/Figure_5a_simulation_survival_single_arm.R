@@ -23,6 +23,7 @@ library(ggh4x)
 # Jobname where results are stored.
 stores_res <- "directory/to/store/simulations"
 setwd(store_res)
+#setwd("/scratch/klvq491/simsurvextrap_slurm_mix_weib_full1")
 
 # Read in scenarios data
 scenarios <- readRDS("scenarios.rds")
