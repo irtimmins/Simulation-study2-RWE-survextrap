@@ -175,7 +175,7 @@ sjob_all_est_combine_two_arm_freq <- slurm_apply(
 
 system(check_status)
 
-View(pars_est_combine_single_arm_freq)
+#View(pars_est_combine_single_arm_freq)
 
 # test <- readRDS("two_arm_freq_mod1/all_res.rds")
 # test
@@ -192,7 +192,6 @@ View(pars_est_combine_single_arm_freq)
 # Use rsimsum to compute RMST/iRMST performance measures.
 ####################################################
 
-scenarios <- readRDS("scenarios.rds")
 estimand_labels <- readRDS("estimand_labels.rds")
 
 pars_simsum_rmst_single_arm_freq  <- scenarios_single_arm_freq %>%
@@ -260,8 +259,20 @@ performance_all_two_arm_freq %>%
   filter(stat == "bias")
 
 performance_all_single_arm_freq %>%
-  filter(t == 40) %>%
-  filter(stat == "bias")
+  # filter(t == 40) %>%
+  #  filter(estimand == "irmst") %>%
+  filter(stat == "nsim") %>%
+  select(est) %>%
+  distinct() %>%
+  pull()
+
+performance_all_two_arm_freq %>%
+ # filter(t == 40) %>%
+#  filter(estimand == "irmst") %>%
+  filter(stat == "nsim") %>%
+  select(est) %>%
+  distinct() %>%
+  pull()
 
 ##########################################
 

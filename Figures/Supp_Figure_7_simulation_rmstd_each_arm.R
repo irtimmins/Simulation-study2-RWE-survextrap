@@ -1,6 +1,6 @@
 
 #########################################################
-# Figure 7, Simulation study, rmst plot.
+# Supp Figure 7, Simulation study, rmst plot.
 # Generate plots for each rmst time point.
 #########################################################
 
