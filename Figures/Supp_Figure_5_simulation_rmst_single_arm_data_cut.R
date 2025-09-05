@@ -33,6 +33,8 @@ library(forcats)
 # Sensitivity on data cut.
 ############################################################################
 
+setwd("/scratch/klvq491/simsurvextrap_slurm_mix_weib_full2")
+
 scenarios <- readRDS("scenarios.rds")
 performance_res <- readRDS("rmst_and_irmst_performance.rds")
 
@@ -86,41 +88,35 @@ new_model <-
          stan_fit_method == "mcmc",
          mspline_df == 10,
          add_knots %in% c("none", "extra_knots1"),
-         external_bias_model_id %in% c("none","external_bias_mod1"),
+         external_bias_model_id %in% c("none",paste0("external_bias_mod",c(1, 3, 5))),
          backhaz == T) %>%
   mutate(new_model_id = paste0(external_bias_model_id, "_", add_knots)) %>%
   mutate(new_model_id_labels = 0)
 
-
 for(i in 1:nrow(new_model)){
-  # i <- 2
- # if(new_model$external_bias_model_id[i] == "none"){
+  
+  if(new_model$external_bias_model_id[i] == "none"){
     #new_model$add_knots
     label1 <- external_data_models_labels$external_data_label[
       external_data_models_labels$external_bias_model_id == new_model$external_bias_model_id[i]]
     label2 <-  extra_knots_models$extra_knots_labels[
       extra_knots_models$extra_knots_id == new_model$add_knots[i]]
     
-    # label2 <- "*`,`"
-    # label3 <- "~`with`~"
-    # label4 <-  extra_knots_models$extra_knots_labels[
-    #   extra_knots_models$extra_knots_id == new_model$add_knots[i]]
-    
     new_model$new_model_id_labels[i] <- paste0(label1, label2)
     
-  # } else{ 
-  #   
-  #   new_model$new_model_id_labels[i] <- external_data_models_labels$external_data_label[
-  #     external_data_models_labels$external_bias_model_id == new_model$external_bias_model_id[i]]
-  #   
-  # }
+  } else{ 
+    
+    new_model$new_model_id_labels[i] <- external_data_models_labels$external_data_label[
+      external_data_models_labels$external_bias_model_id == new_model$external_bias_model_id[i]]
+    
+  }
 }
 
 # scenarios_test$new_model_id
 new_model$new_model_id
 new_model$new_model_id_labels
 #new_model
-reorder_vec <- c(2,3,1)
+reorder_vec <- c(2,3,4,1,5)
 new_model_levels <- unique(new_model$new_model_id)[reorder_vec]
 new_model_labels <- unique(new_model$new_model_id_labels)[reorder_vec]
 
@@ -167,9 +163,9 @@ data_cut1 <- readRDS("dgm_true_mod1/survival_true_data_cut1.rds")
 data_cut2 <- readRDS("dgm_true_mod1/survival_true_data_cut2.rds")
 data_cut3 <- readRDS("dgm_true_mod1/survival_true_data_cut3.rds")
 
-data_cut1
-data_cut2
-data_cut3
+data_cut1 <- tibble(value = 0.44)
+data_cut2 <- tibble(value = 0.34)
+data_cut3 <- tibble(value = 0.26)
 
 trial_censoring_parameters <- readRDS("trial_censoring_parameters.rds")
 trial_censoring_parameters <- trial_censoring_parameters %>%
@@ -197,13 +193,14 @@ rmst_estimand_vec <- estimand_labels %>%
 
 for(rmst_estimand in rmst_estimand_vec){
   
- # rmst_estimand <- "rmst2_trt0"
-#  
+  # rmst_estimand <- "rmst2_trt0"
+  #  
   # for(i in 1:2){
   #   
 
     #extra_knots_models
     
+
     scen_df <- new_model %>%
       mutate("Scenarios" = factor(new_model_id, 
                                   levels = new_model_levels,
@@ -215,7 +212,7 @@ for(rmst_estimand in rmst_estimand_vec){
              stan_fit_method == "mcmc",
              mspline_df == 10,
              add_knots %in% c("none", "extra_knots1"),
-             external_bias_model_id %in% c("none","external_bias_mod1"),
+             external_bias_model_id %in% c("none",paste0("external_bias_mod", c(1,3,5))),
              backhaz == T) %>%
       left_join(performance_res, by = "scenario_fit_id")  %>%
       filter(estimand_id == rmst_estimand) %>%
@@ -272,10 +269,15 @@ for(rmst_estimand in rmst_estimand_vec){
     
     #View(scen_df)
     
-    col_values <- hue_pal()(3)
-    fill_values <- hue_pal()(3)
+    # col_values <- hue_pal()(3)
+    # fill_values <- hue_pal()(3)
     
-    forest_plot <- 
+    colour_values <- c(hue_pal()(6)[1], hue_pal()(6)[c(1,2,4,6)])
+    fill_values <- c( "white", hue_pal()(6)[1],  hue_pal()(6)[c(2,4,6)])
+
+    
+    
+  #  forest_plot <- 
       scen_df %>%
       filter(stat == "mean") %>%
       mutate(true_value = true_value) %>%
@@ -300,22 +302,22 @@ for(rmst_estimand in rmst_estimand_vec){
                    colour = "gray50",
                    alpha = 0.3)+
       geom_point(aes(#group = scenario_fit_id, 
-        colour = `Data Cut-off`,
-        fill = `Data Cut-off`,
-        shape = Scenarios),
+        colour = Scenarios,
+        fill = Scenarios,
+        shape = `Data Cut-off`),
         na.rm = FALSE,
         alpha = 1,
         stroke = 1,
-        size = 2) + 
+        size = 2)+ 
       geom_segment(aes(x= true_value, xend = est, y = y_height, yend = y_height,
-                       colour = `Data Cut-off`),  alpha = 0.35)+
+                       colour = Scenarios),  alpha = 0.35)#+
       # geom_point(aes(x=lower, y = y_height, colour = `Data Cut-off`),
       #            shape = 91, size = 3)+
       # geom_point(aes(x=upper, y = y_height, colour = `Data Cut-off`),
       #            shape = 93, size = 3)+
-      scale_colour_manual(values = col_values)+
-      scale_shape_manual("Settings", values = c(21,22,24))+
-      scale_fill_manual(values = fill_values)+
+      scale_colour_manual("Settings", values = col_values)+
+      scale_shape_manual(values = c(21,22,24))+
+      scale_fill_manual("Settings", values = fill_values)+
       scale_x_continuous(x_axis_label, limits = c(x_min, x_max))+
       guides(                              
         shape = guide_legend(override.aes=list(colour = "gray60",
