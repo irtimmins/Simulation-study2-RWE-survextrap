@@ -18,6 +18,9 @@ library(purrr)
 library(wrapr)
 library(patchwork)
 library(readr)
+library(survminer)
+library(ggsurvfit)
+library(survextrap)
 
 #############################################################
 # specify path to case study data
@@ -35,11 +38,19 @@ setwd("/projects/aa/statistical_innovation/survextrap/cetux_case_study")
 load("surv_plots.Rdata") # load survival stats
 load("haz_plots.Rdata") # load hazard stats
 
+# Run Case_study_single_arm to get knots.
+#knots1 <- models_control[[1]]$mspline$knots
+#knots12 <- models_control[[12]]$mspline$knots
+#saveRDS(knots1, "knots1.rds")
+#saveRDS(knots12, "knots12.rds")
+knots1 <- readRDS("knots1.rds")
+knots12 <- readRDS("knots2.rds")
+
 colour_fill <- "deepskyblue3"
 colour_KM <- "gray20"
 margins1 <- unit(c(0.0,0.0,0.0,0), "cm")
 margins2 <- unit(c(0.0,0.4,0.0,0), "cm")
-hjust_vec <- c(-0.8/.pt, -0.8/.pt, -4.5/.pt, 1.5/.pt)
+hjust_vec <- c(-3.7/.pt, -6.6/.pt, -4.5/.pt, 1.5/.pt)
 
 dataset <- c("Trial only",
              "Trial only", 
@@ -48,15 +59,16 @@ dataset <- c("Trial only",
 
 title_vec <- c("(a) Trial data only, no extra knots",
                "(b) Trial data only, with extra knots",
-               "(b) Trial data and population rates",
-               "(c) Trial, population rates and SEER registry data")
+               "(c) Trial data and population rates",
+               "(d) Trial, population rates and SEER registry data")
 
-knots_vec <- c("None", rep("10,25", 3)) 
+knots_vec <- c("None", rep("10,15,25", 3)) 
+knots_vec_list <- c(1, 12, 12, 12) 
 
 
 population_data_plot <- function(plot, dataset){
   
-  bh_label <- tibble(x=37, y=0.078, lab = "Population \nmortality")
+  bh_label <- tibble(x=37, y=0.072, lab = "Population \nmortality")
   seer_label <- tibble(x=15, y=0.3, lab = "SEER registry \ndata")
   
   if(dataset == "Trial only"){
@@ -93,6 +105,10 @@ population_data_plot <- function(plot, dataset){
 
 for(i in 1:4){
   #i <- 1
+  
+ knots <- get(paste0("knots", knots_vec_list[i]))
+  
+  
  surv_plot_single_arm <- surv_plots %>% 
     filter(df == 10, prior_rate==1)  %>%
     filter(`Extra knots` == knots_vec[i]) %>%
@@ -105,6 +121,7 @@ for(i in 1:4){
           axis.title.x = element_text(size = 8),
           strip.text.x = element_text(size = 4),
           plot.margin = margins1)+
+    geom_vline(xintercept = knots, colour = "gray35", alpha = 0.3)+
     geom_ribbon(aes(x = t, ymin = lower, ymax = upper), fill= colour_fill, alpha = 0.12)+
     geom_line(aes(x=t, y=median), lwd=1, colour = colour_fill) +
     geom_line(aes(x=t, y=lower), linetype = "solid", alpha = 0.2, colour = colour_fill) +
@@ -128,6 +145,7 @@ for(i in 1:4){
           axis.title.x = element_text(size = 8),
           strip.text.x = element_text(size = 4),
           plot.margin = margins2)+
+    geom_vline(xintercept = knots, colour = "gray35", alpha = 0.3)+
     geom_ribbon(aes(x = t, ymin = lower, ymax = upper), fill= colour_fill, alpha = 0.12)+
     geom_line(aes(x=t, y=median), lwd=1, colour = colour_fill) +
     geom_line(aes(x=t, y=lower), linetype = "solid", alpha = 0.2, colour = colour_fill) +
@@ -169,11 +187,12 @@ plot_all_single_arm <- plot_grid(
   rel_heights = c(1,-0.05,1,-0.05,1, -0.05, 1),
   ncol = 1)
 
-plot_all_single_arm
+print(plot_all_single_arm)
 
-tiff(file = "Plots/Figure_1_new.tiff",   
+
+tiff(file = "Figure_1_new.tiff",   
      width = 5.8, 
-     height = 5.3,
+     height = 6.5,
      units = 'in',  
      res = 300, 
      compression = "lzw")

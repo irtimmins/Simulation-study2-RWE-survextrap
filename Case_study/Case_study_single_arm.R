@@ -1,3 +1,4 @@
+
 # If running interactively, requires 64Gb of memory
 # (or remove models once their summary stats have been calculated)
 
@@ -27,12 +28,17 @@ library(readr)
 # specify path where results are to be stored.
 #############################################################
 
+setwd("/home/klvq491/simulation_survival/Simulation-study2-RWE-survextrap/")
 store_res <- "directory/to/store/case_study"
+store_res <- "/projects/aa/statistical_innovation/survextrap/cetux_case_study"
+setwd("/projects/aa/statistical_innovation/survextrap/cetux_case_study_opt")
 
 #############################################################
 # call scripts to create functions.
 #############################################################
 
+source("Functions/estimands.R")
+source("Functions/simulation_functions.R")
 source("Functions/case_study_functions.R")
 
 # Load datasets from Bonner trial. 
@@ -82,12 +88,17 @@ options(mc.cores = 1)
 # options(mc.cores = parallel::detectCores())
 chains <- 4; iter <- 2000
 smooth_model <- "exchangeable"
+fit_method <- "opt"
 
 # Whether to run single arm models or load in predictions from disk
-run_single_arm_models <- FALSE
+run_single_arm_models <- TRUE
 
 if(run_single_arm_models){
   models_control <- list()
+  
+  # fit MCMC or opt approximation.
+
+  
   # We define the default model and investigate 1-way sensitivity analyses to this set-up
   df_base <- 10 # degrees of freedom
   ek_base <- NULL # extra knots after end of trial follow-up
@@ -104,7 +115,8 @@ if(run_single_arm_models){
                    prior_hscale=prior_hscale, prior_hsd = prior_hsd_base,
                    external=external_base, 
                    backhaz=backhaz_base,
-                   smooth_model = smooth_model)
+                   smooth_model = smooth_model,
+                   fit_method = fit_method)
   
   # loop over no. df for trial data
   for(df in c(3,6,10)){
@@ -117,8 +129,9 @@ if(run_single_arm_models){
                      prior_hscale=prior_hscale, prior_hsd = prior_hsd_base,
                      external=external_base, 
                      backhaz=backhaz_base,
-                     smooth_model = smooth_model
-      )
+                     smooth_model = smooth_model,
+                     fit_method = fit_method)
+
   }
   
   
@@ -149,8 +162,9 @@ if(run_single_arm_models){
                        prior_hscale=prior_hscale, prior_hsd = prior_hsd_base,
                        external=external, 
                        backhaz=backhaz,
-                       smooth_model = smooth_model
-        )
+                       smooth_model = smooth_model,
+                       fit_method = fit_method)
+
     }
   }
   
@@ -166,8 +180,9 @@ if(run_single_arm_models){
                      prior_hscale=prior_hscale, prior_hsd = prior_hsd,
                      external=external_base, 
                      backhaz=backhaz_base,
-                     smooth_model = smooth_model
-      )
+                     smooth_model = smooth_model,
+                     fit_method = fit_method)
+    
   }
   
   
