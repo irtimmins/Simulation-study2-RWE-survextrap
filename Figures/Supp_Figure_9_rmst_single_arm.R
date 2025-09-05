@@ -95,7 +95,7 @@ new_model <-  scenarios %>%
          waning_model_id == "waning_mod1") %>%
   mutate(new_model_id = paste0(external_bias_model_id, "_", add_knots)) %>%
   mutate(new_model_id_labels = 0) 
-View(new_model)
+# View(new_model)
 
 for(i in 1:nrow(new_model)){
   
@@ -170,14 +170,14 @@ for(rmst_estimand in rmst_estimand_vec){
                       "external_bias_mod1_extra_knots1",
                       "external_bias_mod5_extra_knots1")
       
-      new_labels <- c( "Exponential model",
-                       "Weibull model",
-                       "Royston-Parmar spline model,\ndf = 3",
-                       "survextrap model, no external data,\nno extra knots",
-                       "survextrap model, no external data,\nwith extra knots at t=5,10,25",
-                       "survextrap model,\nwith external data with +20% bias",
-                       "survextrap model,\nwith unbiased external data",
-                       "survextrap model,\nwith external data with −20% bias")
+      new_labels <- c( "Exponential",
+                       "Weibull",
+                       "Royston-Parmar spline,\ndf = 3",
+                       "survextrap, no external data,\nno extra knots",
+                       "survextrap, no external data,\nwith extra knots at t=5,10,25",
+                       "survextrap,\nwith external data with +20% bias",
+                       "survextrap,\nwith unbiased external data",
+                       "survextrap,\nwith external data with −20% bias")
 
       scen_df <- bind_rows(scen_freq_all_df, 
                                scen_survextrap_all_df) %>%
@@ -271,10 +271,10 @@ for(rmst_estimand in rmst_estimand_vec){
       #            shape = 91, size = 3, alpha = 0.5)+
       # geom_point(aes(x=upper, y = y_height, colour = Scenarios), 
       #            shape = 93, size = 3, alpha = 0.5)+
-      scale_colour_manual("Models", values = colour_values)+
-      scale_fill_manual("Models", values = fill_values)+
-      scale_shape_manual("Models", values = shape_values)+
-      scale_size_manual("Models", values = size_values)+
+      scale_colour_manual("Model", values = colour_values)+
+      scale_fill_manual("Model", values = fill_values)+
+      scale_shape_manual("Model", values = shape_values)+
+      scale_size_manual("Model", values = size_values)+
       scale_x_continuous(x_axis_label, limits = c(x_min, x_max))
   
     forest_plot
