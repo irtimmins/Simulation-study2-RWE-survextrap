@@ -23,8 +23,15 @@ library(readr)
 # specify path to case study data
 #############################################################
 
+setwd("/home/klvq491/simulation_survival/Simulation-study2-RWE-survextrap/")
+control <- readRDS("Data/Bonner_control.RDS")
+km_control <- survminer::ggsurvplot(survfit(Surv(years, d) ~ 1, data=control))$data.survplot
+
 store_res <- "directory/to/store/case_study"
 setwd(store_res)
+setwd("/projects/aa/statistical_innovation/survextrap/cetux_case_study")
+#store_res <- "directory/to/store/case_study"
+#setwd(store_res)
 
 # Load datasets.
 load("surv_plots.Rdata") # load survival stats
