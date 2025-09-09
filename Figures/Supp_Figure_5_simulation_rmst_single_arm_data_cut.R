@@ -267,17 +267,13 @@ for(rmst_estimand in rmst_estimand_vec){
       mutate(label = paste0(toupper(estimand), " at ", t, "-y")) %>%
       pull(label)
     
-    #View(scen_df)
-    
-    # col_values <- hue_pal()(3)
-    # fill_values <- hue_pal()(3)
-    
+
     colour_values <- c(hue_pal()(6)[1], hue_pal()(6)[c(1,2,4,6)])
     fill_values <- c( "white", hue_pal()(6)[1],  hue_pal()(6)[c(2,4,6)])
 
     
     
-  #  forest_plot <- 
+    forest_plot <- 
       scen_df %>%
       filter(stat == "mean") %>%
       mutate(true_value = true_value) %>%
@@ -308,37 +304,36 @@ for(rmst_estimand in rmst_estimand_vec){
         na.rm = FALSE,
         alpha = 1,
         stroke = 1,
-        size = 2)+ 
+        size = 2.3)+ 
       geom_segment(aes(x= true_value, xend = est, y = y_height, yend = y_height,
-                       colour = Scenarios),  alpha = 0.35)#+
+                       colour = Scenarios),  alpha = 0.35)+
       # geom_point(aes(x=lower, y = y_height, colour = `Data Cut-off`),
       #            shape = 91, size = 3)+
       # geom_point(aes(x=upper, y = y_height, colour = `Data Cut-off`),
       #            shape = 93, size = 3)+
-      scale_colour_manual("Settings", values = col_values)+
+      scale_colour_manual("Settings", values = colour_values)+
       scale_shape_manual(values = c(21,22,24))+
       scale_fill_manual("Settings", values = fill_values)+
       scale_x_continuous(x_axis_label, limits = c(x_min, x_max))+
       guides(                              
         shape = guide_legend(override.aes=list(colour = "gray60",
                                                fill = "gray60"),
-                             order = 3),
+                             order = 1),
         colour = guide_legend(override.aes=list(shape = 21,
                                                 size = 1.7,
                                                 stroke = 1,
                                                 fill = fill_values),
-                              order = 1),
+                              order = 3),
         fill = guide_legend(override.aes=list(shape = 21,
                                               size = 1.7,
                                               stroke = 1,
                                               fill = c("white")),
-                            order = 1))
+                            order = 3))
 
     
     forest_plot  
     saveRDS(forest_plot, paste0("plots/single_arm/forest_",rmst_estimand,"_single_arm_plot_datacut.rds"))
-    
-    
+   
   #   
   # }
   # 
@@ -377,8 +372,8 @@ for(rmst_estimand in rmst_estimand_vec){
   # 
   
   tiff(file = paste0("plots/single_arm/forest_",rmst_estimand,"_single_arm_datacut.tiff"),   
-       width = 5.6, 
-       height = 3.3,
+       width = 4.6, 
+       height = 4.2,
        units = 'in',  
        res = 300, 
        compression = "lzw")

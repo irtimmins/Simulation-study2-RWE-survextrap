@@ -986,7 +986,7 @@ pars_est_combine <- scenarios %>%
 sjob_all_est_combine <- slurm_apply(combine_sim_and_true, 
                              pars_est_combine,
                              jobname = "all_est_combine",
-                             nodes = 20, 
+                             nodes = 4, 
                              cpus_per_node = 4, 
                              submit = TRUE,
                              pkgs = package_attach,
@@ -1014,7 +1014,7 @@ pars_simsum_rmst <- scenarios %>%
 sjob_simsum_rmst <- slurm_apply(simsum_rmst, 
                                 pars_simsum_rmst,
                                 jobname = "simsum_rmst",
-                                nodes = 10, 
+                                nodes = 4, 
                                 cpus_per_node = 4, 
                                 submit = TRUE,
                                 pkgs = package_attach,
@@ -1044,6 +1044,12 @@ performance_all %>%
   select(estimand_id) %>%
   distinct() %>%
   summarise(count = n())
+
+performance_all %>%
+  filter(stat == "nsim") %>%
+  select(est) %>%
+  distinct()
+
 
 ########################################
 # Combine mspline knots locations.
