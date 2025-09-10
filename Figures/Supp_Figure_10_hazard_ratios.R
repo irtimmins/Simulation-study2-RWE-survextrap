@@ -109,58 +109,59 @@ new_model_labels <- unique(new_model$new_model_id_labels)[c(2,3,5,4,1,6,7)]
 # Combine true and estimated hazards.
 ###########################################################
 
+scen_df <- scenarios %>%
+  mutate(add_knots = if_else(is.na(add_knots), "default", add_knots)) %>%
+  mutate(include_external_data = if_else(include_external_data, "yes", "no")) %>%
+  rename(Model = model) %>%
+  mutate(Model = case_when(Model == "ph" ~ 1,
+                           Model == "nonph" ~ 2,
+                           Model == "separate" ~ 3)) %>%
+  mutate(Model = factor(Model, levels = c(1,2,3), 
+                        labels = c("PH", 
+                                   "Non-PH", 
+                                   "Separate arms" ))) %>%
+  # mutate(add_knots %in% c("default", "extra_knots5")) %>%
+  filter(weibull_model_id == "weibull_mod1") %>%
+  # filter based on analysis 1 .
+  filter(design_id == "two_arm", 
+         stan_fit_method == "mcmc",
+         mspline_df == 10,
+         data_cut_model_id == "data_cut_mod2",
+         add_knots %in% c("none", "extra_knots1"),
+         external_bias_model_id %in%  c("none", 
+                                        "external_bias_mod1", "external_bias_mod3",
+                                        "external_bias_mod5"),
+         waning_model_id == "waning_mod1",
+         backhaz == T) 
+
+
+dgm_true <- readRDS("dgm_true.rds")
+
+for(i in 1:nrow(scen_df)){
+  #i <- 200
+  temp <- readRDS(paste0(scen_df$scenario_fit_id[i], "/all_res.rds"))
+  #summary(as.factor(temp$estimand))
+  temp <- temp %>%
+    filter(estimand == "hr",
+           isim <= 50)
+  
+  if(i == 1){
+    res <- temp
+  }  else  {
+    res <- rbindlist(list(res, temp))
+  }
+  print(paste0("file ", i, "/", nrow(scen_df)))
+  res <- as_tibble(res)
+}
+
 
 for(j in 1:3){
   
-  scen_df <- scenarios %>%
-    mutate(add_knots = if_else(is.na(add_knots), "default", add_knots)) %>%
-    mutate(include_external_data = if_else(include_external_data, "yes", "no")) %>%
-    rename(Model = model) %>%
-    mutate(Model = case_when(Model == "ph" ~ 1,
-                             Model == "nonph" ~ 2,
-                             Model == "separate" ~ 3)) %>%
-    mutate(Model = factor(Model, levels = c(1,2,3), 
-                          labels = c("PH", 
-                                     "Non-PH", 
-                                     "Separate arms" ))) %>%
-    # mutate(add_knots %in% c("default", "extra_knots5")) %>%
-    filter(weibull_model_id == "weibull_mod1") %>%
-    # filter based on analysis 1 .
-    filter(trt_effect_model_id == paste0("trt_effect_mod",j),
-           design_id == "two_arm", 
-           stan_fit_method == "mcmc",
-           mspline_df == 10,
-           data_cut_model_id == "data_cut_mod2",
-           add_knots %in% c("none", "extra_knots1"),
-           external_bias_model_id %in%  c("none", 
-                                          "external_bias_mod1", "external_bias_mod3",
-                                          "external_bias_mod5"),
-           waning_model_id == "waning_mod1",
-           backhaz == T) 
-  
-  dgm_true <- readRDS("dgm_true.rds")
-  
-  for(i in 1:nrow(scen_df)){
-    #i <- 200
-    temp <- readRDS(paste0(scen_df$scenario_fit_id[i], "/all_res.rds"))
-    #summary(as.factor(temp$estimand))
-    temp <- temp %>%
-      filter(estimand == "hr",
-             isim <= 50)
-    
-    if(i == 1){
-      res <- temp
-    }  else  {
-      res <- rbindlist(list(res, temp))
-    }
-    print(paste0("file ", i, "/", nrow(scen_df)))
-    res <- as_tibble(res)
-  }
-  
-  
-  #i <- 1
+  #j <- 1
   # Extract scenarios to plot.
+  
   scen_df2 <- scen_df  %>%
+    filter(trt_effect_model_id == paste0("trt_effect_mod",j)) %>%
     mutate(new_model_id = paste0(external_bias_model_id, "_", add_knots)) %>%
     mutate("Scenarios" = factor(new_model_id, 
                                 levels = new_model_levels,
@@ -198,7 +199,11 @@ for(j in 1:3){
                                       margin = margin(0.085,0.2,0.085,0.2, "cm"),
                                       angle  = 0),
           strip.background = element_rect(fill = "white", 
-                                          colour = "black", linewidth = rel(2))) +
+                                          colour = "black", linewidth = rel(2)),
+          panel.border = element_rect(fill = NA, 
+                                      colour = "grey60"),
+          panel.grid = element_line(colour = "grey95"),
+          panel.grid.minor = element_line(linewidth = rel(0.1))) +
     geom_line()+
     geom_vline(xintercept = 5, colour = "gray30", linetype = "dashed", alpha = 0.6) +
     geom_hline(yintercept = 1, linewidth = 1, 
@@ -210,7 +215,7 @@ for(j in 1:3){
     #scale_y_continuous("Survival",limits = c(0,1), labels = scales::percent)+
     scale_y_continuous("Hazard ratio", breaks = c(0.25, 0.5, 1, 2, 4)) +
     coord_trans(y = "log10", ylim=c(0.2, 4))+
-   #facet_wrap(Model~Scenarios, nrow = 5)+
+    #facet_wrap(Model~Scenarios, nrow = 5)+
     facet_grid(Scenarios~Model)+
     guides(linewidth = "none", alpha = "none", colour = "none") 
   
@@ -238,31 +243,50 @@ dev.off()
 }
 
 # Attempt to combine all.
+plot_a <- plot1+
+  theme(legend.position="none",
+        plot.title = element_text(size=10, face="bold", hjust = -0.1))+
+  labs(title = "(a) Scenario 1: Constant effect")
 
-plot_all <- plot_grid(plot1+
-                        theme(legend.position="none",
-                              plot.title = element_text(size=10, face="bold"))+
-                        labs(title = "(a) Scenario 1: \n Constant effect"),
-                      plot2+
-                        theme(legend.position="none",
-                              plot.title = element_text(size=10, face="bold"))+
-                        labs(title = "(b) Scenario 2: \n Waning effect"),
-                      plot3+
-                        theme(legend.position="none",
-                              plot.title = element_text(size=10, face="bold"))+
-                        labs(title = "(c) Scenario 3: Delayed then \n waning effect"),
-                      align = "v",
-                      rel_heights=c(1,1,1),
-                      nrow = 3)
+plot_a
 
-plot_all
+plot_b <- plot2+
+  theme(legend.position="none",
+        plot.title = element_text(size=10, face="bold", hjust = -0.1))+
+  labs(title = "(b) Scenario 2: Waning effect")
+plot_b
 
-tiff(file = "plots/two_arm/hr_all.tiff",   
+plot_c <- plot3+
+  theme(legend.position="none",
+        plot.title = element_text(size=10, face="bold", hjust = -0.15))+
+  labs(title = "(c) Scenario 3: Delayed then waning effect")
+plot_c
+
+tiff(file = "plots/two_arm/hr_figure_a.tiff",   
      width = 6.5, 
-     height = 8,
+     height = 4.5,
      units = 'in',  
      res = 300, 
      compression = "lzw")
-print(plot_all)
+print(plot_a)
+dev.off()
+
+tiff(file = "plots/two_arm/hr_figure_b.tiff",   
+     width = 6.5, 
+     height = 4.5,
+     units = 'in',  
+     res = 300, 
+     compression = "lzw")
+print(plot_b)
+dev.off()
+
+
+tiff(file = "plots/two_arm/hr_figure_c.tiff",   
+     width = 6.5, 
+     height = 4.5,
+     units = 'in',  
+     res = 300, 
+     compression = "lzw")
+print(plot_c)
 dev.off()
 
