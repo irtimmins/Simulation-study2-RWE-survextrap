@@ -105,9 +105,9 @@ new_model_labels <- unique(new_model$new_model_id_labels)[c(2,3,5,4,1,6,7)]
 
 
 
-###########################################################
+############################################################
 # Combine true and estimated hazards.
-###########################################################
+############################################################
 
 scen_df <- scenarios %>%
   mutate(add_knots = if_else(is.na(add_knots), "default", add_knots)) %>%
