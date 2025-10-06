@@ -1,3 +1,5 @@
+# For running additional scenarios with data cuts and RWE bias.
+
 #############################################################
 # Load packages
 #############################################################
